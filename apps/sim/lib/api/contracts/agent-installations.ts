@@ -84,3 +84,100 @@ export const installAgentReleaseContract = defineRouteContract({
     schema: installAgentReleaseResponseSchema,
   },
 })
+
+export const agentInstallationUpdatePolicySchema = z.enum([
+  'pending',
+  'accepted',
+  'deferred',
+  'current',
+])
+
+export const pendingAgentInstallationUpdateSchema = z.object({
+  installationId: nonEmptyIdSchema,
+  workflowId: nonEmptyIdSchema,
+  workflowName: z.string(),
+  workspaceId: nonEmptyIdSchema.nullable(),
+  pinnedReleaseId: nonEmptyIdSchema,
+  pinnedVersion: z.number().int().positive(),
+  latestReleaseId: nonEmptyIdSchema,
+  latestVersion: z.number().int().positive(),
+  updatePolicy: agentInstallationUpdatePolicySchema,
+  updatedAt: z.string().datetime(),
+})
+
+export const listPendingAgentInstallationUpdatesResponseSchema = z.object({
+  updates: z.array(pendingAgentInstallationUpdateSchema),
+})
+
+export type ListPendingAgentInstallationUpdatesResponse = z.output<
+  typeof listPendingAgentInstallationUpdatesResponseSchema
+>
+
+/** Session GET: installations with updatePolicy=pending for the caller. */
+export const listPendingAgentInstallationUpdatesContract = defineRouteContract({
+  method: 'GET',
+  path: '/api/agent-installations/updates',
+  response: {
+    mode: 'json',
+    schema: listPendingAgentInstallationUpdatesResponseSchema,
+  },
+})
+
+export const agentInstallationIdParamsSchema = z.object({
+  id: nonEmptyIdSchema,
+})
+
+export const acceptAgentInstallationUpdateResponseSchema = z.object({
+  installationId: nonEmptyIdSchema,
+  workflowId: nonEmptyIdSchema,
+  previousReleaseId: nonEmptyIdSchema,
+  previousVersion: z.number().int().positive(),
+  releaseId: nonEmptyIdSchema,
+  version: z.number().int().positive(),
+  updatePolicy: agentInstallationUpdatePolicySchema,
+  workspaceId: nonEmptyIdSchema.nullable(),
+  credentialBindings: z.record(z.string().min(1), nonEmptyIdSchema),
+  updatedAt: z.string().datetime(),
+  /** True when the installer already had an active pin on the latest release. */
+  consolidated: z.boolean(),
+})
+
+export type AcceptAgentInstallationUpdateResponse = z.output<
+  typeof acceptAgentInstallationUpdateResponseSchema
+>
+
+/** Session POST: Accept pending update → repin Installation to latest AgentRelease. */
+export const acceptAgentInstallationUpdateContract = defineRouteContract({
+  method: 'POST',
+  path: '/api/agent-installations/[id]/accept',
+  params: agentInstallationIdParamsSchema,
+  response: {
+    mode: 'json',
+    schema: acceptAgentInstallationUpdateResponseSchema,
+  },
+})
+
+export const deferAgentInstallationUpdateResponseSchema = z.object({
+  installationId: nonEmptyIdSchema,
+  workflowId: nonEmptyIdSchema,
+  releaseId: nonEmptyIdSchema,
+  version: z.number().int().positive(),
+  updatePolicy: z.literal('deferred'),
+  workspaceId: nonEmptyIdSchema.nullable(),
+  updatedAt: z.string().datetime(),
+})
+
+export type DeferAgentInstallationUpdateResponse = z.output<
+  typeof deferAgentInstallationUpdateResponseSchema
+>
+
+/** Session POST: Defer pending update — stay pinned; updatePolicy=deferred. */
+export const deferAgentInstallationUpdateContract = defineRouteContract({
+  method: 'POST',
+  path: '/api/agent-installations/[id]/defer',
+  params: agentInstallationIdParamsSchema,
+  response: {
+    mode: 'json',
+    schema: deferAgentInstallationUpdateResponseSchema,
+  },
+})

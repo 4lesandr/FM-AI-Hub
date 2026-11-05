@@ -39,7 +39,7 @@ export interface PublishAgentReleaseResult {
  * Uses the same redaction path as export (`sanitizeWorkflowForSharing` via
  * `buildWorkflowExportPayload`) so author secrets never land in the release.
  * Publish N+1 marks non-revoked installations pinned to older releases of the
- * same workflow as `pending` (Accept/Defer APIs are a later slice).
+ * same workflow as `pending` (Accept/Defer via /api/agent-installations).
  */
 export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
   operation: workflowOperations.publish,
