@@ -184,3 +184,41 @@ export const deferAgentInstallationUpdateContract = defineRouteContract({
     schema: deferAgentInstallationUpdateResponseSchema,
   },
 })
+
+export const executeAgentInstallationBodySchema = z
+  .object({
+    input: z.unknown().optional(),
+    triggerBlockId: nonEmptyIdSchema.optional(),
+  })
+  .optional()
+  .default({})
+
+export const executeAgentInstallationResponseSchema = z.object({
+  installationId: nonEmptyIdSchema,
+  releaseId: nonEmptyIdSchema,
+  workflowId: nonEmptyIdSchema,
+  version: z.number().int().positive(),
+  /** Installer (Installation.userId) — not AgentRelease owner. */
+  userId: nonEmptyIdSchema,
+  workspaceId: nonEmptyIdSchema,
+  executionId: nonEmptyIdSchema,
+  status: z.enum(['completed', 'failed', 'paused', 'cancelled']),
+  output: z.unknown().optional(),
+  error: z.unknown().nullable().optional(),
+})
+
+export type ExecuteAgentInstallationResponse = z.output<
+  typeof executeAgentInstallationResponseSchema
+>
+
+/** Session POST: run pinned release under installer identity + credentialBindings. */
+export const executeAgentInstallationContract = defineRouteContract({
+  method: 'POST',
+  path: '/api/agent-installations/[id]/execute',
+  params: agentInstallationIdParamsSchema,
+  body: executeAgentInstallationBodySchema,
+  response: {
+    mode: 'json',
+    schema: executeAgentInstallationResponseSchema,
+  },
+})
