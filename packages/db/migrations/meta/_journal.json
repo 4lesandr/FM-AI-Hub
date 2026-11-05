@@ -3165,6 +3165,34 @@
       "when": 1793784865754,
       "tag": "0452_people_scim_change_due_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 453,
+      "version": "7",
+      "when": 1793895910717,
+      "tag": "0453_agent_release_installation",
+      "breakpoints": true
+    },
+    {
+      "idx": 454,
+      "version": "7",
+      "when": 1793900000000,
+      "tag": "0454_agent_installation_credential_bindings",
+      "breakpoints": true
+    },
+    {
+      "idx": 455,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0455_agent_release_share_revoked",
+      "breakpoints": true
+    },
+    {
+      "idx": 456,
+      "version": "7",
+      "when": 1794100000000,
+      "tag": "0456_agent_release_organization_id",
+      "breakpoints": true
     }
   ]
 }

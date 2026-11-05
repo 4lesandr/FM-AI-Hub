@@ -102,6 +102,8 @@ export interface DeploymentConfigContext {
   providerConfig: Record<string, unknown>
   requestId: string
   triggerId: string
+  /** Deploying actor — used when a provider can resolve routing from a stored connection. */
+  userId?: string
 }
 
 /** Provider-owned updates to the canonical webhook registration. */

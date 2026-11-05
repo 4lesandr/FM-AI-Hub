@@ -294,6 +294,33 @@ function handleInvitationRedirects(
 }
 
 /**
+ * App Store Install-by-link + Installation chat: unauthenticated visitors go to
+ * login with callback back to `/install/{token}` or `/installations/{id}/chat`.
+ */
+function handleInstallRedirects(
+  request: NextRequest,
+  hasActiveSession: boolean
+): NextResponse | null {
+  const { pathname, search } = request.nextUrl
+  const isInstallLink = pathname.startsWith('/install/')
+  const isInstallationChat = pathname.startsWith('/installations/')
+  if (!isInstallLink && !isInstallationChat) {
+    return null
+  }
+
+  if (!hasActiveSession && !search.includes('callbackUrl')) {
+    const callbackParam = encodeURIComponent(`${pathname}${search}`)
+    return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackParam}`, request.url))
+  }
+
+  const response = NextResponse.next()
+  response.headers.set('Content-Security-Policy', generateRuntimeCSP())
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  return response
+}
+
+/**
  * Handles security filtering for suspicious user agents
  */
 function handleSecurityFiltering(request: NextRequest): NextResponse | null {
@@ -302,8 +329,11 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
   const isWebhookEndpoint =
     pathname.startsWith('/api/webhooks/trigger/') ||
     pathname.startsWith('/api/webhooks/tiktok') ||
+    pathname.startsWith('/api/webhooks/fvks') ||
     pathname.startsWith('/api/webhooks/agentmail')
   const isMcpEndpoint = pathname.startsWith('/api/mcp/')
+  /** FVKS meet → Hub Agents API (server-to-server, may omit UA). */
+  const isAgentsAppApi = pathname.startsWith('/api/app/v1')
   const isDiscoveryEndpoint =
     pathname.startsWith('/.well-known/oauth-authorization-server') ||
     pathname.startsWith('/.well-known/oauth-protected-resource') ||
@@ -313,7 +343,13 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
 
   // Block suspicious requests, but exempt machine-to-machine endpoints that may
   // legitimately omit User-Agent headers (webhooks, MCP calls, and protocol discovery).
-  if (isSuspicious && !isWebhookEndpoint && !isMcpEndpoint && !isDiscoveryEndpoint) {
+  if (
+    isSuspicious &&
+    !isWebhookEndpoint &&
+    !isMcpEndpoint &&
+    !isAgentsAppApi &&
+    !isDiscoveryEndpoint
+  ) {
     // Scanner traffic (empty or tool user agents probing /admin.php etc.); the 403 is the response.
     logger.debug('Blocked suspicious request', {
       userAgent,
@@ -443,6 +479,9 @@ export function proxy(request: NextRequest) {
   const invitationRedirect = handleInvitationRedirects(request, hasActiveSession)
   if (invitationRedirect) return applyIndexingPolicy(request, invitationRedirect)
 
+  const installRedirect = handleInstallRedirects(request, hasActiveSession)
+  if (installRedirect) return applyIndexingPolicy(request, installRedirect)
+
   const securityBlock = handleSecurityFiltering(request)
   if (securityBlock) return applyIndexingPolicy(request, securityBlock)
 
@@ -501,6 +540,8 @@ export const config = {
     '/login',
     '/signup',
     '/invite/:path*', // Match invitation routes
+    '/install/:path*', // App Store Install-by-link
+    '/installations/:path*', // Installation chat (installer identity)
     // Runtime CORS. The desktop's raw upload routes and the realtime relay's document persists are
     // left out: running the proxy makes Next buffer the body, cutting it off at its 10 MB proxy
     // limit, and those bodies are whole files or document snapshots.

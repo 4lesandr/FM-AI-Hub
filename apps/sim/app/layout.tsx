@@ -17,6 +17,7 @@ import {
   isReactScanEnabled,
 } from '@/lib/core/config/env-flags'
 import { ConsentProvider } from '@/app/_shell/consent/consent-provider'
+import { AgentInstallationUpdatesBanner } from '@/app/_shell/agent-installation-updates-banner'
 import { DesktopUpdateGate } from '@/app/_shell/desktop-update-gate'
 import { DesktopUpdateNotification } from '@/app/_shell/desktop-update-notification'
 import { HydrationErrorHandler } from '@/app/_shell/hydration-error-handler'
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 consentRequired={isHosted}
               />
               <TooltipProvider>
+                <AgentInstallationUpdatesBanner />
                 <BrandedLayout>{children}</BrandedLayout>
               </TooltipProvider>
             </SessionProvider>

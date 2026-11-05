@@ -527,6 +527,19 @@ export const env = createEnv({
     X_CLIENT_SECRET:                       z.string().optional(),                  // X (Twitter) OAuth client secret
     TIKTOK_CLIENT_ID:                      z.string().optional(),                  // TikTok OAuth client key (TikTok calls this "client_key")
     TIKTOK_CLIENT_SECRET:                  z.string().optional(),                  // TikTok OAuth client secret
+    FVKS_EVENTS_TOKEN:                     z.string().min(16).optional(),          // Path token for FM Meetings events ingress (/api/webhooks/fvks/<token>)
+    FVKS_EVENTS_SIGNING_SECRET:            z.string().min(16).optional(),          // Optional HMAC secret for x-fvks-signature (t=<unix>,v1=<hex>)
+    // FM Meetings (FVKS) token-exchange → jwt-bearer (parity FMAH AutoConnectService)
+    HUB_OIDC_ISSUER:                       z.string().url().optional(),            // Keycloak realm issuer; falls back to SSO_ISSUER
+    HUB_OIDC_CLIENT_ID:                    z.string().optional(),                  // Hub client id with token-exchange permission
+    HUB_OIDC_CLIENT_SECRET:                z.string().optional(),                  // Hub client secret
+    HUB_OIDC_PROVIDER_ID:                  z.string().optional(),                  // account.providerId for SSO access token (default SSO_PROVIDER_ID / keycloak)
+    HUB_IDP_AUDIENCES:                     z.string().optional(),                  // slug=audience pairs, e.g. fvks=meet
+    FVKS_MCP_URL:                          z.string().url().optional(),            // FVKS MCP base URL
+    FVKS_MCP_CLIENT_ID:                    z.string().optional(),                  // Preregistered Hub OAuth client at FVKS
+    FVKS_MCP_CLIENT_SECRET:                z.string().optional(),                  // Preregistered Hub OAuth client secret
+    FVKS_MCP_TOKEN_URL:                    z.string().url().optional(),            // Optional explicit token endpoint (skip discovery)
+    HUB_APP_KEYS:                          z.string().optional(),                  // Agents API HMAC keys: app:secret or app@connector:secret (aud=fmah-agents)
     CONFLUENCE_CLIENT_ID:                  z.string().optional(),                  // Atlassian Confluence OAuth client ID
     CONFLUENCE_CLIENT_SECRET:              z.string().optional(),                  // Atlassian Confluence OAuth client secret
     JIRA_CLIENT_ID:                        z.string().optional(),                  // Atlassian Jira OAuth client ID

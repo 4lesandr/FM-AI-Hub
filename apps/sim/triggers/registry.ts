@@ -235,6 +235,11 @@ import {
   fivetranTransformationSucceededTrigger,
   fivetranWebhookTrigger,
 } from '@/triggers/fivetran'
+import {
+  fvksMeetingEndedTrigger,
+  fvksRecordingStoppedTrigger,
+  fvksWebhookTrigger,
+} from '@/triggers/fvks'
 import { genericWebhookTrigger } from '@/triggers/generic'
 import {
   githubIssueClosedTrigger,
@@ -864,6 +869,9 @@ export const TRIGGER_REGISTRY: TriggerRegistry = {
   fivetran_transformation_start: fivetranTransformationStartTrigger,
   fivetran_transformation_succeeded: fivetranTransformationSucceededTrigger,
   fivetran_webhook: fivetranWebhookTrigger,
+  fvks_recording_stopped: fvksRecordingStoppedTrigger,
+  fvks_meeting_ended: fvksMeetingEndedTrigger,
+  fvks_webhook: fvksWebhookTrigger,
   fathom_new_meeting: fathomNewMeetingTrigger,
   fathom_webhook: fathomWebhookTrigger,
   gmail_poller: gmailPollingTrigger,

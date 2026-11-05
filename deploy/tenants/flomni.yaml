@@ -1,0 +1,32 @@
+# Контур FM AI Hub — Flomni (ns hub). Каркас; helm overlay добьём на /2.
+publicHost: hub.fm.flomni.ru
+namespace: hub
+
+brand:
+  name: FM AI Hub
+  # logoUrl / faviconUrl / wordmarkUrl — до выкладки
+  logoUrl: ""
+  faviconUrl: ""
+  wordmarkUrl: ""
+
+# Обязательные env для чарта helm/sim (app.env) — черновик процесса /2
+appEnv:
+  NEXT_PUBLIC_APP_URL: https://hub.fm.flomni.ru
+  BETTER_AUTH_URL: https://hub.fm.flomni.ru
+  NEXT_PUBLIC_BRAND_NAME: FM AI Hub
+  ENTERPRISE_ENABLED: "true"
+  NEXT_PUBLIC_ENTERPRISE_ENABLED: "true"
+  # billing off на self-host — уточнить флаги чарта на /2
+  SSO_ENABLED: "true"          # после регистрации SSO provider
+  NEXT_PUBLIC_SSO_ENABLED: "true"
+  EMAIL_PASSWORD_SIGNUP_ENABLED: "false"
+
+# Keycloak fteam — клиент завести до выкладки (Brief / админ)
+oidc:
+  issuer: https://auth.flomni.com/realms/fteam
+  clientId: ""   # TBD, не пересечь со старым hub на VM
+  idpHint: yandex360
+  redirectUri: https://hub.fm.flomni.ru/api/auth/callback/keycloak
+  # точный callback path сверить со Sim SSO docs на /2
+
+chart: helm/sim

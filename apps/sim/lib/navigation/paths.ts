@@ -98,6 +98,8 @@ const NOINDEX_PATH_ROOTS = [
   '/extension',
   '/resume',
   '/invite',
+  '/install',
+  '/installations',
   '/unsubscribe',
   '/f',
   '/w',

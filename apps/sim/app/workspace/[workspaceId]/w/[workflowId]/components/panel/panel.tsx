@@ -57,6 +57,7 @@ import { createCommands } from '@/app/workspace/[workspaceId]/utils/commands'
 import {
   Deploy,
   Editor,
+  Publish,
   Toolbar,
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/components'
 import {
@@ -894,8 +895,13 @@ export const Panel = memo(function Panel() {
               </Button>
             </div>
 
-            {/* Deploy and Run */}
+            {/* Publish, Deploy and Run */}
             <div className='flex gap-1.5'>
+              <Publish
+                activeWorkflowId={activeWorkflowId}
+                userPermissions={userPermissions}
+                disabled={workflowLocked}
+              />
               <Deploy
                 activeWorkflowId={activeWorkflowId}
                 userPermissions={userPermissions}
