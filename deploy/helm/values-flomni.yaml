@@ -1,6 +1,6 @@
 # FLOMNI overlay for helm/sim — FM AI Hub (hub.fm.flomni.ru, ns hub)
-# Base: helm/sim. Apply: helm upgrade --install fm-ai-hub ./helm/sim -n hub -f deploy/helm/values-flomni.yaml
-# Secrets: use existingSecret in prod — do not commit real keys.
+# Apply (после cutover FMAH): helm upgrade --install fm-ai-hub ./helm/sim -n hub -f deploy/helm/values-flomni.yaml
+# Secrets: existingSecret hub-secrets — ключи должны совпадать с ожиданиями Sim (см. hub-secrets.example.md).
 
 global:
   imageRegistry: "ghcr.io"
@@ -33,14 +33,22 @@ app:
 ingress:
   enabled: true
   className: nginx
-  hosts:
-    - host: hub.fm.flomni.ru
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: hub-fm-flomni-ru-tls
-      hosts:
-        - hub.fm.flomni.ru
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  app:
+    host: hub.fm.flomni.ru
+    paths:
+      - path: /
+        pathType: Prefix
+  realtime:
+    host: hub.fm.flomni.ru
+    paths:
+      - path: /socket.io
+        pathType: Prefix
+  tls:
+    enabled: true
+    secretName: hub-fm-flomni-ru-tls

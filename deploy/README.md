@@ -34,7 +34,8 @@ deploy/
 6. Включить SSO_* после IdP
 7. Verify: health, SSO, websocket, бренд; invite
 
-Скрипт: `deploy/bin/ci_deploy_hub.sh` · values: `deploy/helm/values-flomni.yaml`
+Скрипт: `deploy/bin/ci_deploy_hub.sh` · values: `deploy/helm/values-flomni.yaml`  
+Cutover FMAH→Sim: [`CUTOVER-fmah-to-sim.md`](CUTOVER-fmah-to-sim.md) (ns `hub` сейчас занят `hub-tenant`).
 
 ## Mac
 

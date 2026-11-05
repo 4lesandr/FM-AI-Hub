@@ -26,23 +26,40 @@ test -f "$CHART/Chart.yaml"
 
 kubectl get ns "$NS" >/dev/null 2>&1 || kubectl create ns "$NS"
 
-HELM_ARGS=(upgrade --install "$RELEASE" "$CHART" -n "$NS" -f "$VALUES" --wait --timeout 15m)
+SET_ARGS=()
 if [ -n "${IMAGE_TAG:-}" ]; then
-  HELM_ARGS+=(--set "app.image.tag=${IMAGE_TAG}")
+  SET_ARGS+=(--set "app.image.tag=${IMAGE_TAG}")
+fi
+# Chart requires postgresql.auth.password when bundled PG is on.
+# Real apply: HUB_POSTGRES_PASSWORD (Actions secret) или --set снаружи.
+# Dry-run: placeholder (в кластер не пишется).
+if [ "${DRY_RUN:-true}" = "true" ]; then
+  SET_ARGS+=(--set "postgresql.auth.password=dry-run-placeholder")
+elif [ -n "${HUB_POSTGRES_PASSWORD:-}" ]; then
+  SET_ARGS+=(--set "postgresql.auth.password=${HUB_POSTGRES_PASSWORD}")
+else
+  echo "HUB_POSTGRES_PASSWORD required for apply (bundled postgres)"
+  exit 1
 fi
 
 if [ "${DRY_RUN:-true}" = "true" ]; then
   echo "=== dry-run helm template ==="
-  helm template "$RELEASE" "$CHART" -n "$NS" -f "$VALUES" ${IMAGE_TAG:+--set "app.image.tag=${IMAGE_TAG}"} | head -n 80
+  helm template "$RELEASE" "$CHART" -n "$NS" -f "$VALUES" "${SET_ARGS[@]}" | sed -n '1,80p' || true
   echo "... (truncated)"
-  helm upgrade --install "$RELEASE" "$CHART" -n "$NS" -f "$VALUES" --dry-run=client ${IMAGE_TAG:+--set "app.image.tag=${IMAGE_TAG}"}
-  echo "dry_run OK — apply: workflow_dispatch dry_run=false + secret hub-secrets in ns"
+  helm upgrade --install "$RELEASE" "$CHART" -n "$NS" -f "$VALUES" --dry-run=client "${SET_ARGS[@]}"
+  echo "dry_run OK — apply только после cutover FMAH (см. deploy/CUTOVER-fmah-to-sim.md)"
   exit 0
 fi
 
 kubectl -n "$NS" get secret hub-secrets >/dev/null \
-  || { echo "missing secret/${NS}/hub-secrets — create before real apply"; exit 1; }
+  || { echo "missing secret/${NS}/hub-secrets — Sim keys, не FMAH (см. hub-secrets.example.md)"; exit 1; }
 
-helm "${HELM_ARGS[@]}"
+# Guard: не ставить поверх живого FMAH hub-tenant
+if helm -n "$NS" status hub >/dev/null 2>&1; then
+  echo "REFUSE: helm release 'hub' (FMAH hub-tenant) still present — uninstall first (cutover)"
+  exit 1
+fi
+
+helm upgrade --install "$RELEASE" "$CHART" -n "$NS" -f "$VALUES" --wait --timeout 15m "${SET_ARGS[@]}"
 kubectl -n "$NS" get deploy,ingress,svc
 echo "deployed $RELEASE → expect https://hub.fm.flomni.ru after DNS/TLS"

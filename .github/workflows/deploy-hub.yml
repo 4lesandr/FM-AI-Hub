@@ -32,6 +32,7 @@ jobs:
       # Тот же kubeconfig, что у FVKS кнопки (кластер meet). Завести в secrets репо.
       HUB_KUBECONFIG: ${{ secrets.HUB_KUBECONFIG }}
       VK_KUBECONFIG: ${{ secrets.VK_KUBECONFIG }}
+      HUB_POSTGRES_PASSWORD: ${{ secrets.HUB_POSTGRES_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-kubectl@v4
