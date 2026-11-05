@@ -5514,6 +5514,19 @@ export const agentInstallation = pgTable(
     releaseId: text('release_id')
       .notNull()
       .references(() => agentRelease.id, { onDelete: 'restrict' }),
+    /**
+     * Installer's workspace used to authorize credential bindings at Install.
+     * Runtime (#6) reads credentials as this installer, not the release author.
+     */
+    workspaceId: text('workspace_id').references(() => workspace.id, { onDelete: 'set null' }),
+    /**
+     * Slot key (`blockId:field`) → installer's credential id. Author secrets never land here;
+     * only credentials the installer may use (authorizeCredentialUseForAuth).
+     */
+    credentialBindings: json('credential_bindings')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
     updatePolicy: agentInstallationUpdatePolicyEnum('update_policy').notNull().default('current'),
     revokedAt: timestamp('revoked_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -5526,6 +5539,7 @@ export const agentInstallation = pgTable(
     userIdIdx: index('agent_installation_user_id_idx').on(table.userId),
     releaseIdIdx: index('agent_installation_release_id_idx').on(table.releaseId),
     updatePolicyIdx: index('agent_installation_update_policy_idx').on(table.updatePolicy),
+    workspaceIdIdx: index('agent_installation_workspace_id_idx').on(table.workspaceId),
   })
 )
 

@@ -3172,6 +3172,13 @@
       "when": 1793895910717,
       "tag": "0453_agent_release_installation",
       "breakpoints": true
+    },
+    {
+      "idx": 454,
+      "version": "7",
+      "when": 1793900000000,
+      "tag": "0454_agent_installation_credential_bindings",
+      "breakpoints": true
     }
   ]
 }

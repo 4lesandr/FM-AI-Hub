@@ -294,6 +294,30 @@ function handleInvitationRedirects(
 }
 
 /**
+ * App Store Install-by-link: unauthenticated visitors go to login with callback back to /install/{token}.
+ */
+function handleInstallRedirects(
+  request: NextRequest,
+  hasActiveSession: boolean
+): NextResponse | null {
+  if (!request.nextUrl.pathname.startsWith('/install/')) {
+    return null
+  }
+
+  if (!hasActiveSession && !request.nextUrl.search.includes('callbackUrl')) {
+    const shareToken = request.nextUrl.pathname.split('/').pop()
+    const callbackParam = encodeURIComponent(`/install/${shareToken ?? ''}`)
+    return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackParam}`, request.url))
+  }
+
+  const response = NextResponse.next()
+  response.headers.set('Content-Security-Policy', generateRuntimeCSP())
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  return response
+}
+
+/**
  * Handles security filtering for suspicious user agents
  */
 function handleSecurityFiltering(request: NextRequest): NextResponse | null {
@@ -452,6 +476,9 @@ export function proxy(request: NextRequest) {
   const invitationRedirect = handleInvitationRedirects(request, hasActiveSession)
   if (invitationRedirect) return applyIndexingPolicy(request, invitationRedirect)
 
+  const installRedirect = handleInstallRedirects(request, hasActiveSession)
+  if (installRedirect) return applyIndexingPolicy(request, installRedirect)
+
   const securityBlock = handleSecurityFiltering(request)
   if (securityBlock) return applyIndexingPolicy(request, securityBlock)
 
@@ -510,6 +537,7 @@ export const config = {
     '/login',
     '/signup',
     '/invite/:path*', // Match invitation routes
+    '/install/:path*', // App Store Install-by-link
     // Runtime CORS. The desktop's raw upload routes and the realtime relay's document persists are
     // left out: running the proxy makes Next buffer the body, cutting it off at its 10 MB proxy
     // limit, and those bodies are whole files or document snapshots.
