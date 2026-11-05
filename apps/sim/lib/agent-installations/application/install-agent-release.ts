@@ -7,7 +7,10 @@ import {
   assertRequiredCredentialSlotsBound,
   collectAgentCredentialSlots,
 } from '@/lib/agent-installations/credential-slots'
-import { assertInstallerMayResolveShare } from '@/lib/agent-installations/share-access'
+import {
+  agentReleaseVisibleToInstaller,
+  assertInstallerMayResolveShare,
+} from '@/lib/agent-installations/share-access'
 import { AuthType } from '@/lib/auth/hybrid'
 import { authorizeCredentialUseForAuth } from '@/lib/auth/credential-access'
 import { defineOperation } from '@/lib/core/application'
@@ -79,11 +82,18 @@ export const installAgentRelease = defineAuthorizedCredentialUserUseCase({
       .select({
         id: agentRelease.id,
         workflowId: agentRelease.workflowId,
+        organizationId: agentRelease.organizationId,
         version: agentRelease.version,
         state: agentRelease.state,
       })
       .from(agentRelease)
-      .where(and(eq(agentRelease.shareToken, token), isNull(agentRelease.shareRevokedAt)))
+      .where(
+        and(
+          eq(agentRelease.shareToken, token),
+          isNull(agentRelease.shareRevokedAt),
+          agentReleaseVisibleToInstaller(installerUserId)
+        )
+      )
       .limit(1)
 
     if (!release) {
@@ -93,6 +103,7 @@ export const installAgentRelease = defineAuthorizedCredentialUserUseCase({
     await assertInstallerMayResolveShare({
       installerUserId,
       workflowId: release.workflowId,
+      releaseOrganizationId: release.organizationId,
     })
 
     const slots = collectAgentCredentialSlots(release.state as Partial<WorkflowState>)

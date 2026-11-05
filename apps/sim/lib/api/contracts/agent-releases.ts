@@ -16,6 +16,8 @@ export const publishAgentReleaseBodySchema = z
 export const publishAgentReleaseResponseSchema = z.object({
   releaseId: nonEmptyIdSchema,
   workflowId: nonEmptyIdSchema,
+  /** Tenant stamp from the author's workspace (null = personal / non-org). */
+  organizationId: nonEmptyIdSchema.nullable(),
   version: z.number().int().positive(),
   shareToken: z.string().min(1),
   shareUrl: z.string().url(),

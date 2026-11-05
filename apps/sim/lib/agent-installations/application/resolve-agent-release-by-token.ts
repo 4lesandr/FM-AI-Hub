@@ -6,7 +6,10 @@ import {
   collectAgentCredentialSlots,
   type AgentCredentialSlot,
 } from '@/lib/agent-installations/credential-slots'
-import { assertInstallerMayResolveShare } from '@/lib/agent-installations/share-access'
+import {
+  agentReleaseVisibleToInstaller,
+  assertInstallerMayResolveShare,
+} from '@/lib/agent-installations/share-access'
 import { defineOperation } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { defineAuthorizedCredentialUserUseCase } from '@/lib/credentials/application/authorized-user-use-case'
@@ -21,6 +24,7 @@ export interface ResolveAgentReleaseByTokenInput {
 export interface ResolveAgentReleaseByTokenResult {
   releaseId: string
   workflowId: string
+  organizationId: string | null
   workflowName: string
   workflowDescription: string | null
   version: number
@@ -64,6 +68,7 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
       .select({
         releaseId: agentRelease.id,
         workflowId: agentRelease.workflowId,
+        organizationId: agentRelease.organizationId,
         version: agentRelease.version,
         shareToken: agentRelease.shareToken,
         state: agentRelease.state,
@@ -73,7 +78,13 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
       })
       .from(agentRelease)
       .innerJoin(workflow, eq(workflow.id, agentRelease.workflowId))
-      .where(and(eq(agentRelease.shareToken, token), isNull(agentRelease.shareRevokedAt)))
+      .where(
+        and(
+          eq(agentRelease.shareToken, token),
+          isNull(agentRelease.shareRevokedAt),
+          agentReleaseVisibleToInstaller(principal.userId)
+        )
+      )
       .limit(1)
 
     if (!row) {
@@ -83,6 +94,7 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
     await assertInstallerMayResolveShare({
       installerUserId: principal.userId,
       workflowId: row.workflowId,
+      releaseOrganizationId: row.organizationId,
     })
 
     // Any active Installation for this user+workflow (pin may lag the share-token release after Publish N+1).
@@ -113,6 +125,7 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
     logger.info('Resolved agent release by share token', {
       releaseId: row.releaseId,
       workflowId: row.workflowId,
+      organizationId: row.organizationId,
       version: row.version,
       credentialSlotCount: credentialSlots.length,
       alreadyInstalled: Boolean(existing),
@@ -122,6 +135,7 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
     return {
       releaseId: row.releaseId,
       workflowId: row.workflowId,
+      organizationId: row.organizationId,
       workflowName: row.workflowName,
       workflowDescription: row.workflowDescription,
       version: row.version,

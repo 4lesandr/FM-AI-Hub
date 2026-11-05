@@ -5472,6 +5472,14 @@ export const agentRelease = pgTable(
       .notNull()
       .references(() => workflow.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
+    /**
+     * Tenant stamp from the author's workspace at Publish (null = personal / non-org).
+     * Resolve/install/list filter on this column so isolation is not only a live
+     * workflow→workspace org-bound application check.
+     */
+    organizationId: text('organization_id').references(() => organization.id, {
+      onDelete: 'set null',
+    }),
     /** Sanitized workflow state (no author secrets; variable values redacted on Publish). */
     state: json('state').notNull(),
     shareToken: text('share_token').notNull(),
@@ -5490,6 +5498,7 @@ export const agentRelease = pgTable(
     ),
     shareTokenUnique: uniqueIndex('agent_release_share_token_unique').on(table.shareToken),
     workflowIdIdx: index('agent_release_workflow_id_idx').on(table.workflowId),
+    organizationIdIdx: index('agent_release_organization_id_idx').on(table.organizationId),
     createdByIdx: index('agent_release_created_by_idx').on(table.createdBy),
     shareRevokedAtIdx: index('agent_release_share_revoked_at_idx').on(table.shareRevokedAt),
   })

@@ -2,6 +2,7 @@ import { resolvePrincipalSubjectUserId, type SessionPrincipal } from '@sim/auth/
 import { agentInstallation, agentRelease, db, workflow } from '@sim/db'
 import { createLogger } from '@sim/logger'
 import { and, desc, eq, isNull } from 'drizzle-orm'
+import { agentReleaseVisibleToInstaller } from '@/lib/agent-installations/share-access'
 import { defineOperation } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { defineAuthorizedCredentialUserUseCase } from '@/lib/credentials/application/authorized-user-use-case'
@@ -55,6 +56,7 @@ export const listPendingAgentInstallationUpdates = defineAuthorizedCredentialUse
         updatedAt: agentInstallation.updatedAt,
         pinnedReleaseId: agentRelease.id,
         pinnedVersion: agentRelease.version,
+        pinnedOrganizationId: agentRelease.organizationId,
         workflowId: agentRelease.workflowId,
         workflowName: workflow.name,
       })
@@ -65,7 +67,8 @@ export const listPendingAgentInstallationUpdates = defineAuthorizedCredentialUse
         and(
           eq(agentInstallation.userId, userId),
           eq(agentInstallation.updatePolicy, 'pending'),
-          isNull(agentInstallation.revokedAt)
+          isNull(agentInstallation.revokedAt),
+          agentReleaseVisibleToInstaller(userId)
         )
       )
       .orderBy(desc(agentInstallation.updatedAt))
@@ -74,28 +77,31 @@ export const listPendingAgentInstallationUpdates = defineAuthorizedCredentialUse
       return { updates: [] }
     }
 
-    const workflowIds = [...new Set(pending.map((row) => row.workflowId))]
-    const latestByWorkflow = new Map<string, { releaseId: string; version: number }>()
+    const latestByInstallation = new Map<string, { releaseId: string; version: number }>()
 
-    for (const workflowId of workflowIds) {
+    for (const row of pending) {
+      const tenantClause =
+        row.pinnedOrganizationId === null
+          ? isNull(agentRelease.organizationId)
+          : eq(agentRelease.organizationId, row.pinnedOrganizationId)
       const [latest] = await db
         .select({
           releaseId: agentRelease.id,
           version: agentRelease.version,
         })
         .from(agentRelease)
-        .where(eq(agentRelease.workflowId, workflowId))
+        .where(and(eq(agentRelease.workflowId, row.workflowId), tenantClause))
         .orderBy(desc(agentRelease.version))
         .limit(1)
 
       if (latest) {
-        latestByWorkflow.set(workflowId, latest)
+        latestByInstallation.set(row.installationId, latest)
       }
     }
 
     const updates: PendingAgentInstallationUpdate[] = []
     for (const row of pending) {
-      const latest = latestByWorkflow.get(row.workflowId)
+      const latest = latestByInstallation.get(row.installationId)
       if (!latest) continue
 
       updates.push({

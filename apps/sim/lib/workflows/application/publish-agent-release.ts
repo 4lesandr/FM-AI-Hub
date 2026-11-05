@@ -38,6 +38,8 @@ export interface PublishAgentReleaseResult {
   releaseId: string
   workflowId: string
   workspaceId: string
+  /** Tenant stamp copied from the author's workspace (null = personal). */
+  organizationId: string | null
   version: number
   shareToken: string
   /** Absolute Install-by-link URL for the author to share. */
@@ -101,6 +103,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       await tx.insert(agentRelease).values({
         id: releaseId,
         workflowId: context.workflowId,
+        organizationId: context.workspaceOrganizationId,
         version,
         state: releaseState,
         shareToken,
@@ -147,6 +150,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
     logger.info('Published agent release', {
       workflowId: context.workflowId,
       workspaceId: context.workspaceId,
+      organizationId: context.workspaceOrganizationId,
       releaseId,
       version: result.version,
       promptTier,
@@ -159,6 +163,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       releaseId,
       workflowId: context.workflowId,
       workspaceId: context.workspaceId,
+      organizationId: context.workspaceOrganizationId,
       version: result.version,
       shareToken,
       shareUrl,

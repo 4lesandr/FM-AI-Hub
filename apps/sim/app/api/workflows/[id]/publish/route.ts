@@ -33,6 +33,7 @@ export const POST = defineInternalJsonRoute({
   present: (result) => ({
     releaseId: result.releaseId,
     workflowId: result.workflowId,
+    organizationId: result.organizationId,
     version: result.version,
     shareToken: result.shareToken,
     shareUrl: result.shareUrl,

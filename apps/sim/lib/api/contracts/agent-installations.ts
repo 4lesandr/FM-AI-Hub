@@ -26,6 +26,8 @@ export const agentInstallationSummarySchema = z.object({
 export const resolveAgentReleaseByTokenResponseSchema = z.object({
   releaseId: nonEmptyIdSchema,
   workflowId: nonEmptyIdSchema,
+  /** Tenant stamp on the release (null = personal / non-org). */
+  organizationId: nonEmptyIdSchema.nullable(),
   workflowName: z.string(),
   workflowDescription: z.string().nullable(),
   version: z.number().int().positive(),

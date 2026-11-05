@@ -122,6 +122,7 @@ export const acceptAgentInstallationUpdate = defineAuthorizedCredentialUserUseCa
       .select({
         id: agentRelease.id,
         workflowId: agentRelease.workflowId,
+        organizationId: agentRelease.organizationId,
         version: agentRelease.version,
       })
       .from(agentRelease)
@@ -132,6 +133,11 @@ export const acceptAgentInstallationUpdate = defineAuthorizedCredentialUserUseCa
       throw new OrchestrationError('not_found', 'Pinned agent release not found')
     }
 
+    const tenantClause =
+      pinned.organizationId === null
+        ? isNull(agentRelease.organizationId)
+        : eq(agentRelease.organizationId, pinned.organizationId)
+
     const [latest] = await db
       .select({
         id: agentRelease.id,
@@ -139,7 +145,7 @@ export const acceptAgentInstallationUpdate = defineAuthorizedCredentialUserUseCa
         state: agentRelease.state,
       })
       .from(agentRelease)
-      .where(eq(agentRelease.workflowId, pinned.workflowId))
+      .where(and(eq(agentRelease.workflowId, pinned.workflowId), tenantClause))
       .orderBy(desc(agentRelease.version))
       .limit(1)
 
