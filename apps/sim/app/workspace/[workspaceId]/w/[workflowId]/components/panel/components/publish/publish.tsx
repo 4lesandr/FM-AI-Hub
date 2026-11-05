@@ -117,7 +117,7 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
           <ChipModalField
             type='copy'
             title='Install link'
-            hint='Anyone with this link can Install a copy. Secrets are redacted from the release.'
+            hint='Org-bound Install link. Secrets/ENV names redacted; prompts are shared IP (use promptTier strip-system to clear system prompts).'
             value={shareUrl}
             copyLabel='Copy install link'
           />

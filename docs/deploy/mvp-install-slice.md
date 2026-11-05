@@ -23,8 +23,13 @@
 | H3 | Accept re-assert slots | Accept against latest release slots + re-authorize bindings |
 | H4 | Revoke share | Publish N+1 → `shareRevokedAt` on older; `POST /api/workflows/[id]/revoke-share` |
 | — | Rate limit GET by-token | `internalRateLimits.user` bucket `agent-releases.by-token` |
+| C2 | Prompt IP policy + strip tier | Default Publish **retains** system/user prompts (App Store). Это **намеренная** передача IP внутри org-bound share (C1) + revoke (H4). Техmitigation: `promptTier: "strip-system"` на `POST …/publish` или org env `AGENT_RELEASE_STRIP_SYSTEM_PROMPTS=true` — очищает system-role messages и `systemPrompt`. Resolve API по-прежнему не отдаёт `state`. |
+| H2 | Secret-like plaintext | Publish harden: short/long-input без `password:true` — heuristics (sk-/ghp_/xox*/Bearer/AKIA/PEM + high-entropy) и имена полей apiKey/token/secret → value `null` |
+| H5 | ENV names opaque | Publish harden: все `{{ENV_NAME}}` → `{{env}}` (имена автора не уходят installer’у / в snapshot) |
 
-Осталось вне минимума: C2 (prompts IP), H2 (non-password text), H5 (ENV_VAR names), org RLS на `agent_release`, credential picker UX.
+Реализация harden: `apps/sim/lib/agent-installations/harden-release-snapshot.ts` (только Publish → AgentRelease; общий export/FVKS не трогаем).
+
+Осталось вне минимума: org RLS на `agent_release`, credential picker UX.
 
 ## Вне среза (явно)
 

@@ -3,6 +3,11 @@ import { agentInstallation, agentRelease, db } from '@sim/db'
 import { createLogger } from '@sim/logger'
 import { generateId, generateShortId } from '@sim/utils/id'
 import { and, eq, inArray, isNull, max, ne } from 'drizzle-orm'
+import {
+  hardenAgentReleaseSnapshot,
+  resolveAgentReleasePromptTier,
+  type AgentReleasePromptTier,
+} from '@/lib/agent-installations/harden-release-snapshot'
 import { redactAgentReleaseVariableValues } from '@/lib/agent-installations/redact-release-variables'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { getBaseUrl } from '@/lib/core/utils/urls'
@@ -11,6 +16,7 @@ import { workflowOperations } from '@/lib/workflows/application/operations'
 import { resolvePrincipalWorkflowContext } from '@/lib/workflows/application/principal-scope'
 import { buildWorkflowExportPayload } from '@/lib/workflows/operations/export-workflow'
 import type { Variable } from '@/stores/variables/types'
+import type { WorkflowState } from '@/stores/workflows/workflow/types'
 
 const logger = createLogger('PublishAgentRelease')
 
@@ -20,6 +26,12 @@ const SHARE_TOKEN_LENGTH = 32
 export interface PublishAgentReleaseInput {
   workflowId: string
   assertedWorkspaceId?: string
+  /**
+   * C2 prompt tier. Default `retain` (App Store needs prompts). Pass
+   * `strip-system` to clear system prompts; env `AGENT_RELEASE_STRIP_SYSTEM_PROMPTS=true`
+   * forces strip when omitted.
+   */
+  promptTier?: AgentReleasePromptTier
 }
 
 export interface PublishAgentReleaseResult {
@@ -35,6 +47,8 @@ export interface PublishAgentReleaseResult {
   installationsMarkedPending: number
   /** Older releases whose share tokens were invalidated by this Publish. */
   sharesRevoked: number
+  /** Effective C2 prompt policy applied to this release snapshot. */
+  promptTier: AgentReleasePromptTier
 }
 
 /**
@@ -42,14 +56,15 @@ export interface PublishAgentReleaseResult {
  *
  * Uses the same redaction path as export (`sanitizeWorkflowForSharing` via
  * `buildWorkflowExportPayload`) so author secrets never land in the release,
- * then strips workflow variable *values* (H1). Publish N+1 marks non-revoked
- * installations pinned to older releases as `pending` and revokes older share
- * tokens (H4) so only the newest Install link works.
+ * then strips workflow variable *values* (H1), hardens the snapshot (C2/H2/H5),
+ * and on Publish N+1 marks non-revoked installations pinned to older releases
+ * as `pending` and revokes older share tokens (H4) so only the newest Install
+ * link works.
  */
 export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
   operation: workflowOperations.publish,
   resolveContext: resolvePrincipalWorkflowContext<PublishAgentReleaseInput>,
-  async execute({ principal, context }): Promise<PublishAgentReleaseResult> {
+  async execute({ principal, context, input }): Promise<PublishAgentReleaseResult> {
     const createdBy = resolvePrincipalSubjectUserId(principal)
     if (!createdBy) {
       throw new OrchestrationError('forbidden', 'Publish requires a signed-in user')
@@ -60,12 +75,16 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       throw new OrchestrationError('not_found', 'Workflow state not found')
     }
 
-    const releaseState = {
-      ...payload.state,
-      variables: redactAgentReleaseVariableValues(
-        payload.state.variables as Record<string, Variable> | undefined
-      ),
-    }
+    const promptTier = resolveAgentReleasePromptTier(input.promptTier)
+    const releaseState = hardenAgentReleaseSnapshot(
+      {
+        ...payload.state,
+        variables: redactAgentReleaseVariableValues(
+          payload.state.variables as Record<string, Variable> | undefined
+        ),
+      } as Partial<WorkflowState>,
+      { promptTier }
+    )
 
     const releaseId = generateId()
     const shareToken = generateShortId(SHARE_TOKEN_LENGTH)
@@ -130,6 +149,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       workspaceId: context.workspaceId,
       releaseId,
       version: result.version,
+      promptTier,
       installationsMarkedPending: result.installationsMarkedPending,
       sharesRevoked: result.sharesRevoked,
       principalKind: principal.kind,
@@ -145,6 +165,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       createdAt: result.createdAt.toISOString(),
       installationsMarkedPending: result.installationsMarkedPending,
       sharesRevoked: result.sharesRevoked,
+      promptTier,
     }
   },
 })

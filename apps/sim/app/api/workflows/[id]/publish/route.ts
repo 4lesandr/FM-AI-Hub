@@ -26,7 +26,10 @@ export const POST = defineInternalJsonRoute({
   auth: internalSessionAuth,
   rateLimit: NO_INTERNAL_RATE_LIMIT,
   errorPolicy: createInternalWorkflowErrorPolicy('Failed to publish agent release'),
-  mapInput: ({ params }) => ({ workflowId: params.id }),
+  mapInput: ({ params, body }) => ({
+    workflowId: params.id,
+    promptTier: body?.promptTier,
+  }),
   present: (result) => ({
     releaseId: result.releaseId,
     workflowId: result.workflowId,
@@ -36,5 +39,6 @@ export const POST = defineInternalJsonRoute({
     createdAt: result.createdAt,
     installationsMarkedPending: result.installationsMarkedPending,
     sharesRevoked: result.sharesRevoked,
+    promptTier: result.promptTier,
   }),
 })
