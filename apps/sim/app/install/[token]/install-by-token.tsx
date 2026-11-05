@@ -5,7 +5,6 @@ import {
   AuthButton as Chip,
   AuthSelect as ChipSelect,
   type AuthSelectOption as ChipSelectOption,
-  AuthInput,
   AuthLabel as Label,
   AuthStack,
 } from '@sim/auth-ui'
@@ -17,6 +16,7 @@ import { installationChatPath } from '@/lib/navigation/installation-paths'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
 import { AuthFormMessage, AuthHeader, AuthSubmitButton } from '@/app/(auth)/components'
 import { AUTH_BUTTON_CLASS } from '@/app/(auth)/components/constants'
+import { InstallCredentialPicker } from '@/app/install/[token]/install-credential-picker'
 import InstallLayout from '@/app/install/components/layout'
 import {
   useAcceptAgentInstallationUpdate,
@@ -121,12 +121,22 @@ export function InstallByToken() {
       setFormError('Выберите workspace')
       return
     }
+    const missingRequired = (meta?.credentialSlots ?? []).filter(
+      (slot) => slot.required && !bindings[slot.key]?.trim()
+    )
+    if (missingRequired.length > 0) {
+      setFormError('Выберите credentials для обязательных слотов')
+      return
+    }
+    const credentialBindings = Object.fromEntries(
+      Object.entries(bindings).filter(([, credentialId]) => Boolean(credentialId.trim()))
+    )
     setFormError(null)
     try {
       const result = await installMutation.mutateAsync({
         shareToken: token,
         workspaceId: workspaceId.trim(),
-        credentialBindings: bindings,
+        credentialBindings,
       })
       setDoneId(result.installationId)
       router.push(installationChatPath(result.installationId, { title: meta?.workflowName }))
@@ -267,7 +277,10 @@ export function InstallByToken() {
                 aria-label='Workspace'
                 options={workspaceOptions}
                 value={workspaceId || undefined}
-                onChange={setWorkspaceId}
+                onChange={(next) => {
+                  setWorkspaceId(next)
+                  setBindings({})
+                }}
                 disabled={busy || workspacesQuery.isLoading}
                 displayLabel={
                   workspacesQuery.isLoading && !workspaceId ? 'Загрузка…' : undefined
@@ -284,25 +297,23 @@ export function InstallByToken() {
               <div className='au:space-y-3'>
                 <p className='au:text-[var(--auth-secondary)] au:text-control'>Ваши credentials</p>
                 {meta.credentialSlots.map((slot) => (
-                  <div key={slot.key} className='au:flex au:flex-col au:gap-2'>
-                    <Label
-                      htmlFor={`cred-${slot.key}`}
-                      className='au:text-[var(--auth-secondary)] au:text-caption'
-                    >
-                      {slot.blockName} / {slot.field}
-                      {slot.serviceId ? ` (${slot.serviceId})` : ''}
-                      {slot.required ? ' *' : ''}
-                    </Label>
-                    <AuthInput
-                      id={`cred-${slot.key}`}
-                      value={bindings[slot.key] ?? ''}
-                      onChange={(event) =>
-                        setBindings((prev) => ({ ...prev, [slot.key]: event.target.value }))
-                      }
-                      placeholder='credential id'
-                      disabled={busy}
-                    />
-                  </div>
+                  <InstallCredentialPicker
+                    key={slot.key}
+                    slot={slot}
+                    workspaceId={workspaceId}
+                    value={bindings[slot.key] ?? ''}
+                    disabled={busy}
+                    onChange={(credentialId) =>
+                      setBindings((prev) => {
+                        if (!credentialId) {
+                          const next = { ...prev }
+                          delete next[slot.key]
+                          return next
+                        }
+                        return { ...prev, [slot.key]: credentialId }
+                      })
+                    }
+                  />
                 ))}
               </div>
             ) : (
