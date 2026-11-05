@@ -305,6 +305,8 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
     pathname.startsWith('/api/webhooks/fvks') ||
     pathname.startsWith('/api/webhooks/agentmail')
   const isMcpEndpoint = pathname.startsWith('/api/mcp/')
+  /** FVKS meet → Hub Agents API (server-to-server, may omit UA). */
+  const isAgentsAppApi = pathname.startsWith('/api/app/v1')
   const isDiscoveryEndpoint =
     pathname.startsWith('/.well-known/oauth-authorization-server') ||
     pathname.startsWith('/.well-known/oauth-protected-resource') ||
@@ -314,7 +316,13 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
 
   // Block suspicious requests, but exempt machine-to-machine endpoints that may
   // legitimately omit User-Agent headers (webhooks, MCP calls, and protocol discovery).
-  if (isSuspicious && !isWebhookEndpoint && !isMcpEndpoint && !isDiscoveryEndpoint) {
+  if (
+    isSuspicious &&
+    !isWebhookEndpoint &&
+    !isMcpEndpoint &&
+    !isAgentsAppApi &&
+    !isDiscoveryEndpoint
+  ) {
     // Scanner traffic (empty or tool user agents probing /admin.php etc.); the 403 is the response.
     logger.debug('Blocked suspicious request', {
       userAgent,

@@ -1,4 +1,10 @@
 export {
+  AUDIENCE as AGENTS_API_AUDIENCE,
+  authenticateAgentsApiRequest,
+  parseAppKeys,
+  verifyAppAssertion,
+} from '@/lib/fvks/agents-api'
+export {
   connectFvksForUser,
   FvksConnectError,
   getFvksConnectionStatus,

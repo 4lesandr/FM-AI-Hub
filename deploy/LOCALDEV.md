@@ -131,7 +131,7 @@ Callback для оператора meet (секрет `FVKS_MCP_HUB_EVENTS_URL` 
 
 `{NEXT_PUBLIC_APP_URL}/api/webhooks/fvks/{FVKS_EVENTS_TOKEN}`
 
-Не путать с `AGENT_HUB_URL` (панель агентов — `/2e`).  
+Не путать с `AGENT_HUB_URL` (панель агентов — `/2e`, чеклист `docs/deploy/agents-api-meet-cutover.md`). Для панели в localdev: `HUB_APP_KEYS=fvks:<секрет≥32>` (= meet `AGENT_HUB_SECRET`).  
 Чеклист: `docs/deploy/fvks-events-url-cutover.md`.  
 После connect: deploy FVKS trigger (grant авто из connection) → событие meet → 204 на ingress.  
 Догон: `POST /api/fvks/events/catch-up` (сессия).

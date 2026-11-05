@@ -18,6 +18,7 @@
 | `FVKS_MCP_URL` | MCP Встреч (`meet.fm.flomni.ru/mcp`) |
 | `FVKS_MCP_CLIENT_ID` / `FVKS_MCP_CLIENT_SECRET` | preregistered Hub client у FVKS (FMAH connector / `fvks_pairs`) |
 | `FVKS_EVENTS_TOKEN` / `FVKS_EVENTS_SIGNING_SECRET` | ingress событий |
+| `HUB_APP_KEYS` | Agents API для панели Встреч: `fvks:<секрет≥32>` (тот же секрет, что `AGENT_HUB_SECRET` у FVKS) |
 
 Localdev sync без печати значений: `deploy/bin/localdev-fvks-env-from-contour.sh` → `apps/sim/.env.local` (см. `LOCALDEV.md`).
 

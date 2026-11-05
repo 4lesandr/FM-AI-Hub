@@ -539,6 +539,7 @@ export const env = createEnv({
     FVKS_MCP_CLIENT_ID:                    z.string().optional(),                  // Preregistered Hub OAuth client at FVKS
     FVKS_MCP_CLIENT_SECRET:                z.string().optional(),                  // Preregistered Hub OAuth client secret
     FVKS_MCP_TOKEN_URL:                    z.string().url().optional(),            // Optional explicit token endpoint (skip discovery)
+    HUB_APP_KEYS:                          z.string().optional(),                  // Agents API HMAC keys: app:secret or app@connector:secret (aud=fmah-agents)
     CONFLUENCE_CLIENT_ID:                  z.string().optional(),                  // Atlassian Confluence OAuth client ID
     CONFLUENCE_CLIENT_SECRET:              z.string().optional(),                  // Atlassian Confluence OAuth client secret
     JIRA_CLIENT_ID:                        z.string().optional(),                  // Atlassian Jira OAuth client ID

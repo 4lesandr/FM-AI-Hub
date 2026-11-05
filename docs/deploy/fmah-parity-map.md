@@ -68,7 +68,8 @@
 | Триггеры FVKS; fan-out по `grant_id`; deploy: **auto** из stored connection (`/2c`) или ручной `grantId` | Упрощённый дедуп (нет audience[] FMAH) |
 | Env `FVKS_EVENTS_TOKEN`, `FVKS_EVENTS_SIGNING_SECRET` | |
 | Catch-up: `list_events` → `lib/fvks/catch-up` + `POST /api/fvks/events/catch-up` + cron `/api/cron/fvks-events-catch-up`; cursor в connection | Полный Event journal / Dispatch-аудит — нет |
-| Операторский cutover URL: `docs/deploy/fvks-events-url-cutover.md` | **Нет** `/api/app/v1` (panel) — `/2e` |
+| Операторский cutover URL: `docs/deploy/fvks-events-url-cutover.md` | |
+| `/api/app/v1` Agents API adapter (panel/runs/SSE/connect) — `/2e` | Approvals HITL / voice live-sessions |
 | | **Нет** live-sessions / hub-live |
 | | Нет `events://catalog` sync |
 
@@ -76,7 +77,7 @@
 
 1. Сохранить контракт FVKS: один events URL на окружение → Sim; оператор meet/fvcs переписывает **`FVKS_MCP_HUB_EVENTS_URL`** (не `AGENT_HUB_*`) — чеклист `/2d`.
 2. Grant routing: `grant_id` из token-exchange в connection + auto routing key на deploy (`/2c`+`/2d`).
-3. Agents API для панели Встреч: либо порт `/api/app/v1` на Sim (адаптер поверх workflow/chat), либо смена FVKS на новый контракт **до** cutover — иначе UI агентов в meet ломается.
+3. Agents API для панели Встреч: **адаптер** `/api/app/v1` на Sim (`docs/deploy/agents-api-meet-cutover.md`, `/2e`) — FVKS контракт не меняем; cutover = `AGENT_HUB_URL` + общий `HUB_APP_KEYS`/`AGENT_HUB_SECRET`.
 4. Live-in-room: отдельный slice (не блокер событийных агентов, но блокер голосовых агентов в комнате).
 
 ---
@@ -211,7 +212,7 @@ Env (имена, без значений): `HUB_OIDC_ISSUER`, `HUB_OIDC_CLIENT_I
 | `POST /api/webhooks/fvks/[token]` | WIP события FVKS |
 | `/api/mcp/oauth/*`, MCP settings | OAuth к внешним MCP |
 | Workflow deploy + triggers | Запуски по событию/cron |
-| **Нет** `/api/app/v1` | Разрыв с meet UI |
+| `/api/app/v1/*` | Agents API для FVKS meet (`/2e`) |
 
 ---
 
@@ -223,7 +224,7 @@ Env (имена, без значений): `HUB_OIDC_ISSUER`, `HUB_OIDC_CLIENT_I
 | `HUB_KEK` | Envelope токенов MCP | `ENCRYPTION_KEY` (пересобрать secret; не копировать) |
 | `HUB_OIDC_*` | SSO Keycloak | better-auth IdP / org SSO Sim |
 | `HUB_IDP_AUDIENCES` | Auto token exchange | **нет** — добавить |
-| `HUB_APP_KEYS` | Agents API HMAC | **нет** — добавить или сменить FVKS |
+| `HUB_APP_KEYS` | Agents API HMAC | **есть** (`/2e`, тот же секрет что `AGENT_HUB_SECRET`) |
 | `HUB_APP_LIVEKIT_HOSTS` | Голос в комнате | **нет** |
 | `FVKS_MCP_URL` / `FVKS_HUB_API_URL` | MCP + members REST | MCP server URL credential |
 | Events token / signing (на connector) | Ingress auth | `FVKS_EVENTS_TOKEN`, `FVKS_EVENTS_SIGNING_SECRET` |
@@ -249,7 +250,7 @@ Cutover ops: `sim-sandbox/deploy/CUTOVER-fmah-to-sim.md` (secrets пересоб
 | 7 | Keycloak token-exchange → jwt-bearer | done | **код `/2c`** | Нужен live exchange + secrets |
 | 8 | Manual MCP OAuth + refresh | done | есть | Ок как fallback |
 | 9 | MCP tools от имени пользователя | done | generic MCP + `getFvksMcpAuthHeaders` | Привязать tool runtime к stored grant |
-| 10 | Agents API panel в meet | done | **нет** | **Обязателен** или смена FVKS |
+| 10 | Agents API panel в meet | done | **адаптер `/2e`** | Cutover: `AGENT_HUB_URL` + `HUB_APP_KEYS` |
 | 11 | Live agent in LiveKit room | done | **нет** | Отдельный slice; голосовые агенты |
 | 12 | Install-by-link identity | FMAH shares | WIP `/3` | См. as-is-sim-api-hooks; не блокер events |
 
