@@ -127,16 +127,26 @@ export function extractFvksGrantId(
 /**
  * FM Meetings (FVKS) webhook handler. Ingress is `/api/webhooks/fvks/[token]`;
  * deployments route by `grant_id` (same pattern as TikTok `user_openid`).
+ * Empty grantId resolves from the deployer's stored FVKS connection (`/2c`).
  */
 export const fvksHandler: WebhookProviderHandler = {
   ingressMode: 'provider',
   executionMode: 'queue',
 
-  async prepareDeploymentConfig({ providerConfig }) {
-    const grantId = typeof providerConfig.grantId === 'string' ? providerConfig.grantId.trim() : ''
+  async prepareDeploymentConfig({ providerConfig, userId, requestId }) {
+    let grantId = typeof providerConfig.grantId === 'string' ? providerConfig.grantId.trim() : ''
+    if (!grantId && userId) {
+      const { loadFvksStoredTokens } = await import('@/lib/fvks/connection-store')
+      const stored = await loadFvksStoredTokens(userId)
+      const fromConnection = stored?.grant_id?.trim()
+      if (fromConnection) {
+        grantId = fromConnection
+        logger.info(`[${requestId}] FVKS grantId resolved from stored connection`)
+      }
+    }
     if (!grantId) {
       throw new WebhookDeploymentConfigurationError(
-        'Enter the FVKS grant id for this trigger so events can be routed to the workflow.'
+        'Connect FVKS (POST /api/fvks/connect) or enter the grant id so events can be routed to the workflow.'
       )
     }
 

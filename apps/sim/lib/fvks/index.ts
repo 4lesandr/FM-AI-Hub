@@ -5,11 +5,20 @@ export {
   isFvksAutoConnectConfigured,
   loadSsoAccessToken,
 } from '@/lib/fvks/auto-connect'
+export type { FvksCatchUpUserResult, FvksListEventsPage } from '@/lib/fvks/catch-up'
 export {
+  catchUpFvksEventsAll,
+  catchUpFvksEventsForUser,
+  parseFvksListEventsResult,
+} from '@/lib/fvks/catch-up'
+export {
+  advanceFvksEventsCursor,
   clearFvksStoredTokens,
   findUserIdByFvksGrantId,
   getAccessTokenForMcp,
   getFvksConnectionPublic,
+  isCursorAhead,
+  listFvksConnectedUserIds,
   loadFvksStoredTokens,
   saveFvksStoredTokens,
 } from '@/lib/fvks/connection-store'

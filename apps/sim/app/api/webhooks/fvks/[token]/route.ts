@@ -10,6 +10,11 @@ import {
   readStreamToBufferWithLimit,
 } from '@/lib/core/utils/stream-limits'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
+import {
+  advanceFvksEventsCursor,
+  clearFvksStoredTokens,
+  findUserIdByFvksGrantId,
+} from '@/lib/fvks/connection-store'
 import { WEBHOOK_MAX_BODY_BYTES } from '@/lib/webhooks/constants'
 import { dispatchResolvedWebhookTarget, findWebhooksByRoutingKey } from '@/lib/webhooks/processor'
 import {
@@ -77,6 +82,22 @@ export const POST = withRouteHandler(
         return NextResponse.json({ error: 'grant_id is required' }, { status: 400 })
       }
 
+      const ownerUserId = await findUserIdByFvksGrantId(grantId)
+      const event = toRecord(body.event)
+      const eventType =
+        (typeof event.type === 'string' && event.type) ||
+        (typeof body.event_type === 'string' ? body.event_type : null)
+
+      if (eventType === 'grant.revoked') {
+        if (ownerUserId) {
+          await clearFvksStoredTokens(ownerUserId)
+          logger.info(`[${requestId}] Cleared FVKS connection after grant.revoked`, {
+            grantIdPrefix: grantId.slice(0, 12),
+          })
+        }
+        return new NextResponse(null, { status: 204 })
+      }
+
       const webhooks = await findWebhooksByRoutingKey(grantId, requestId, 'fvks')
       let dispatched = 0
       let failed = 0
@@ -90,11 +111,24 @@ export const POST = withRouteHandler(
         if (result.outcome === 'failed') failed += 1
       }
 
+      const cursor =
+        event.cursor != null
+          ? String(event.cursor)
+          : request.headers.get('x-fvks-event-cursor')?.trim() || null
+      if (ownerUserId && cursor) {
+        await advanceFvksEventsCursor(ownerUserId, cursor).catch((error) => {
+          logger.warn(`[${requestId}] FVKS cursor advance failed`, {
+            error: getErrorMessage(error),
+          })
+        })
+      }
+
       logger.info(`[${requestId}] Processed FVKS webhook delivery`, {
         dispatched,
         failed,
         targetCount: webhooks.length,
         grantIdPrefix: grantId.slice(0, 12),
+        knownGrant: Boolean(ownerUserId),
       })
 
       if (failed > 0) {

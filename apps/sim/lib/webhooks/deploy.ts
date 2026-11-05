@@ -716,6 +716,7 @@ export async function resolveWebhookConfigForBlock(input: {
         providerConfig,
         requestId: input.requestId,
         triggerId,
+        userId: input.userId,
       })
       effectiveProvider = prepared.provider ?? effectiveProvider
       Object.assign(providerConfig, prepared.providerConfigUpdates)

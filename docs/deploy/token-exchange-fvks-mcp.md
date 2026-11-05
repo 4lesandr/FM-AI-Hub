@@ -20,8 +20,9 @@ Keycloak access token (account SSO / subject_token из meet)
   → MCP calls: Authorization: Bearer <access> → FVKS_MCP_URL
 ```
 
-Триггеры вебхуков по-прежнему матчятся по `providerConfig.grantId` (= routing key).  
-После connect оператор/UI кладёт возвращённый `grant_id` в trigger (как сейчас вручную) — автоподстановка в deploy config = follow-up.
+Триггеры вебхуков матчятся по `providerConfig.grantId` (= routing key).  
+После connect deploy подставляет `grant_id` из stored connection, если поле Grant ID пустое (`/2d`). Ручной override остаётся.  
+Events URL у FVKS: `docs/deploy/fvks-events-url-cutover.md` (не путать с `AGENT_HUB_URL`).
 
 ---
 

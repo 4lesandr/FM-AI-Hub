@@ -87,6 +87,24 @@ FVKS_MCP_CLIENT_SECRET=…
 Затем (сессия браузера): `POST /api/fvks/connect` → в ответе `grant_id`.  
 Дизайн: `docs/deploy/token-exchange-fvks-mcp.md`. Compose/start scripts не менять.
 
+## FVKS events push (/2d) — optional
+
+В `.env.local` (имена; значения не в git):
+
+```
+FVKS_EVENTS_TOKEN=…          # ≥16; сегмент пути Callback
+# FVKS_EVENTS_SIGNING_SECRET=…  # опц. HMAC
+```
+
+Callback для оператора meet (секрет `FVKS_MCP_HUB_EVENTS_URL` **или** admin events URL клиента `FM AI Hub`):
+
+`{NEXT_PUBLIC_APP_URL}/api/webhooks/fvks/{FVKS_EVENTS_TOKEN}`
+
+Не путать с `AGENT_HUB_URL` (панель агентов — `/2e`).  
+Чеклист: `docs/deploy/fvks-events-url-cutover.md`.  
+После connect: deploy FVKS trigger (grant авто из connection) → событие meet → 204 на ingress.  
+Догон: `POST /api/fvks/events/catch-up` (сессия).
+
 ## Проверка
 
 ```bash

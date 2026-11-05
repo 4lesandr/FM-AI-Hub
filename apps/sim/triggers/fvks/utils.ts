@@ -20,9 +20,9 @@ export function fvksSetupInstructions(eventType: string): string {
       : `This trigger listens for <strong>${eventType}</strong> events for the grant below.`
 
   const instructions = [
-    'Ask a Sim operator to set <code>FVKS_EVENTS_TOKEN</code> (and optionally <code>FVKS_EVENTS_SIGNING_SECRET</code>) on this deployment.',
-    'In <strong>FM Meetings</strong>, set the events Callback URL to <code>{APP_URL}/api/webhooks/fvks/&lt;FVKS_EVENTS_TOKEN&gt;</code> (one URL per environment). Events come from FM Meetings directly — not via FMAH.',
-    'Paste the FVKS <code>grant_id</code> for the connection that should start this workflow.',
+    'Ask a Sim operator to set <code>FVKS_EVENTS_TOKEN</code> (and optionally <code>FVKS_EVENTS_SIGNING_SECRET</code>) on this deployment. Operator cutover: <code>docs/deploy/fvks-events-url-cutover.md</code>.',
+    'In <strong>FM Meetings</strong>, set the events Callback URL to <code>{APP_URL}/api/webhooks/fvks/&lt;FVKS_EVENTS_TOKEN&gt;</code> (secret <code>FVKS_MCP_HUB_EVENTS_URL</code> or MCP client events URL — not <code>AGENT_HUB_URL</code>).',
+    'Connect FVKS in the hub (<code>POST /api/fvks/connect</code>). Leave Grant ID empty to use that connection, or paste a specific <code>grant_id</code>.',
     eventLine,
     'Save the trigger, then deploy the workflow. Events fan out by grant id, not by a per-workflow path.',
   ]
@@ -40,9 +40,10 @@ export function buildFvksExtraFields(triggerId: string): SubBlockConfig[] {
       id: 'grantId',
       title: 'FVKS Grant ID',
       type: 'short-input',
-      placeholder: 'grant_…',
-      description: 'OAuth grant id from the FVKS connection. Used as the webhook routing key.',
-      required: true,
+      placeholder: 'auto from /api/fvks/connect',
+      description:
+        'Optional. OAuth grant id used as the webhook routing key. Empty = use your stored FVKS connection.',
+      required: false,
       mode: 'trigger',
       condition: { field: 'selectedTriggerId', value: triggerId },
     },

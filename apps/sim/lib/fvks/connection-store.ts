@@ -11,6 +11,7 @@ import type { FvksConnectionPublic, FvksStoredTokens } from '@/lib/fvks/types'
 const logger = createLogger('FvksConnectionStore')
 
 const GRANT_KEY_PREFIX = 'fvks:grant:'
+const CONNECTED_USERS_KEY = 'fvks:connected-users'
 const GRANT_TTL_SECONDS = 60 * 60 * 24 * 30 // 30d; refreshed on each connect
 
 function grantRedisKey(grantId: string): string {
@@ -98,7 +99,6 @@ export async function saveFvksStoredTokens(
   userId: string,
   tokens: FvksStoredTokens
 ): Promise<FvksConnectionPublic> {
-  const { encrypted } = await encryptSecret(JSON.stringify(tokens))
   const variables = await readPersonalEnvMap(userId)
 
   let previous: FvksStoredTokens | null = null
@@ -112,20 +112,37 @@ export async function saveFvksStoredTokens(
     }
   }
 
+  const grantChanged = Boolean(
+    previous?.grant_id && tokens.grant_id && previous.grant_id !== tokens.grant_id
+  )
+  const withSince: FvksStoredTokens = {
+    ...tokens,
+    events_since_ms: grantChanged
+      ? (tokens.events_since_ms ?? Date.now())
+      : (tokens.events_since_ms ?? previous?.events_since_ms ?? Date.now()),
+    events_cursor: grantChanged
+      ? (tokens.events_cursor ?? null)
+      : tokens.events_cursor !== undefined
+        ? tokens.events_cursor
+        : (previous?.events_cursor ?? null),
+  }
+  const { encrypted: encryptedWithSince } = await encryptSecret(JSON.stringify(withSince))
+
   await writePersonalEnvMap(userId, {
     ...variables,
-    [FVKS_CONNECTION_ENV_KEY]: encrypted,
+    [FVKS_CONNECTION_ENV_KEY]: encryptedWithSince,
   })
 
   const redis = getRedisClient()
   if (redis) {
     try {
-      if (previous?.grant_id && previous.grant_id !== tokens.grant_id) {
+      if (previous?.grant_id && previous.grant_id !== withSince.grant_id) {
         await redis.del(grantRedisKey(previous.grant_id))
       }
-      if (tokens.grant_id) {
-        await redis.set(grantRedisKey(tokens.grant_id), userId, 'EX', GRANT_TTL_SECONDS)
+      if (withSince.grant_id) {
+        await redis.set(grantRedisKey(withSince.grant_id), userId, 'EX', GRANT_TTL_SECONDS)
       }
+      await redis.sadd(CONNECTED_USERS_KEY, userId)
     } catch (error) {
       logger.warn('FVKS grant Redis index update failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -133,7 +150,7 @@ export async function saveFvksStoredTokens(
     }
   }
 
-  return toPublic(tokens)
+  return toPublic(withSince)
 }
 
 export async function clearFvksStoredTokens(userId: string): Promise<void> {
@@ -144,9 +161,59 @@ export async function clearFvksStoredTokens(userId: string): Promise<void> {
     delete next[FVKS_CONNECTION_ENV_KEY]
     await writePersonalEnvMap(userId, next)
   }
-  if (previous?.grant_id) {
-    const redis = getRedisClient()
-    await redis?.del(grantRedisKey(previous.grant_id)).catch(() => undefined)
+  const redis = getRedisClient()
+  if (redis) {
+    if (previous?.grant_id) {
+      await redis.del(grantRedisKey(previous.grant_id)).catch(() => undefined)
+    }
+    await redis.srem(CONNECTED_USERS_KEY, userId).catch(() => undefined)
+  }
+}
+
+/**
+ * Advance high-water events cursor after a verified push (or catch-up page).
+ * No-op when cursor is empty or not ahead of the stored value.
+ */
+export async function advanceFvksEventsCursor(
+  userId: string,
+  cursor: string | null | undefined
+): Promise<void> {
+  if (cursor == null || cursor === '') return
+  const stored = await loadFvksStoredTokens(userId)
+  if (!stored) return
+  if (stored.events_cursor != null && !isCursorAhead(cursor, stored.events_cursor)) {
+    return
+  }
+  await saveFvksStoredTokens(userId, {
+    ...stored,
+    events_cursor: cursor,
+    updated_at: Date.now(),
+  })
+}
+
+/** Lexicographic / numeric-aware compare for FVKS event.cursor values. */
+export function isCursorAhead(candidate: string, current: string): boolean {
+  if (/^\d+$/.test(candidate) && /^\d+$/.test(current)) {
+    try {
+      return BigInt(candidate) > BigInt(current)
+    } catch {
+      return candidate > current
+    }
+  }
+  return candidate > current
+}
+
+/**
+ * User ids with a live FVKS connection index (for catch-up cron).
+ * Empty when Redis is unavailable.
+ */
+export async function listFvksConnectedUserIds(): Promise<string[]> {
+  const redis = getRedisClient()
+  if (!redis) return []
+  try {
+    return await redis.smembers(CONNECTED_USERS_KEY)
+  } catch {
+    return []
   }
 }
 

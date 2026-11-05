@@ -26,6 +26,13 @@ export interface FvksStoredTokens {
   subject?: FvksTokenSubject
   /** FVKS grant id — webhook routing key */
   grant_id?: string
+  /**
+   * High-water `event.cursor` from push or `list_events` catch-up.
+   * Used to resume after FVKS stops retrying (~40 min).
+   */
+  events_cursor?: string | null
+  /** unix ms — connection created / first events subscription; catch-up skips older */
+  events_since_ms?: number
   acquired_via: FvksAcquiredVia
   connector_slug: string
   mcp_url: string

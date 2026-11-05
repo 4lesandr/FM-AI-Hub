@@ -65,16 +65,17 @@
 | Есть | Нет / gap |
 | --- | --- |
 | Ingress `POST /api/webhooks/fvks/[token]` + HMAC/token verify (`lib/webhooks/providers/fvks.ts`) | Нет журнала Event/audience/Dispatch как у FMAH |
-| Триггеры-блоки `fvks_recording_stopped` / `fvks_meeting_ended` / `fvks_webhook`; fan-out по **ручному** `grantId` | Нет привязки grant→Connection из OAuth/token-exchange |
-| Env `FVKS_EVENTS_TOKEN`, `FVKS_EVENTS_SIGNING_SECRET` | Нет `list_events` catch-up |
-| | **Нет** `/api/app/v1` (panel/runs/SSE/approvals) для FVKS UI |
-| | **Нет** live-sessions / hub-live в комнаты meet |
+| Триггеры FVKS; fan-out по `grant_id`; deploy: **auto** из stored connection (`/2c`) или ручной `grantId` | Упрощённый дедуп (нет audience[] FMAH) |
+| Env `FVKS_EVENTS_TOKEN`, `FVKS_EVENTS_SIGNING_SECRET` | |
+| Catch-up: `list_events` → `lib/fvks/catch-up` + `POST /api/fvks/events/catch-up` + cron `/api/cron/fvks-events-catch-up`; cursor в connection | Полный Event journal / Dispatch-аудит — нет |
+| Операторский cutover URL: `docs/deploy/fvks-events-url-cutover.md` | **Нет** `/api/app/v1` (panel) — `/2e` |
+| | **Нет** live-sessions / hub-live |
 | | Нет `events://catalog` sync |
 
 ### Перенос (минимум до cutover)
 
-1. Сохранить контракт FVKS: один events URL на окружение → Sim; оператор meet/fvcs переписывает Callback с FMAH на Sim.
-2. Grant routing: либо сохранить ручной grantId (MVP), либо (паритет) писать `grant_id` из token endpoint в credential/connection Sim.
+1. Сохранить контракт FVKS: один events URL на окружение → Sim; оператор meet/fvcs переписывает **`FVKS_MCP_HUB_EVENTS_URL`** (не `AGENT_HUB_*`) — чеклист `/2d`.
+2. Grant routing: `grant_id` из token-exchange в connection + auto routing key на deploy (`/2c`+`/2d`).
 3. Agents API для панели Встреч: либо порт `/api/app/v1` на Sim (адаптер поверх workflow/chat), либо смена FVKS на новый контракт **до** cutover — иначе UI агентов в meet ломается.
 4. Live-in-room: отдельный slice (не блокер событийных агентов, но блокер голосовых агентов в комнате).
 
@@ -240,9 +241,9 @@ Cutover ops: `sim-sandbox/deploy/CUTOVER-fmah-to-sim.md` (secrets пересоб
 | # | Функция | FMAH | Sim | До cutover |
 | --- | --- | --- | --- | --- |
 | 1 | FVKS events ingress + signature/token | done | WIP done | Переключить URL у оператора fvcs |
-| 2 | Route by grant_id | Connection auto | manual grantId | Автоиз grant при connect — желательно |
+| 2 | Route by grant_id | Connection auto | auto из connection + optional manual | `/2d` |
 | 3 | Event journal, audience, dedupe, Dispatch | done | нет | Упростить допустимо, поведение «1 run / audience» сохранить |
-| 4 | `list_events` catch-up | done | нет | Нужен до снятия FMAH (дыра ~40м+) |
+| 4 | `list_events` catch-up | done | cursor + cron/API `/2d` | Включить cron до prod cutover |
 | 5 | Trigger filters / `$me` / catalog | done | нет | MVP: type-only; filters — next |
 | 6 | Stop-on-event / concurrency | done | частичный | По приоритету продукта |
 | 7 | Keycloak token-exchange → jwt-bearer | done | **код `/2c`** | Нужен live exchange + secrets |
