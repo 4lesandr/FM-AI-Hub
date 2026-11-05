@@ -10,20 +10,26 @@ import { resolveAgentReleaseByToken } from '@/lib/agent-installations/applicatio
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const NO_INTERNAL_RATE_LIMIT = internalRateLimits.none({
-  reason: 'Authenticated session resolve of a share token is Install meta only.',
+/** Per-user bucket: share-token resolve is cheap but enumerable if unbounded. */
+const RESOLVE_BY_TOKEN_RATE_LIMIT = internalRateLimits.user({
+  bucketName: 'agent-releases.by-token',
+  config: {
+    maxTokens: 30,
+    refillRate: 15,
+    refillIntervalMs: 60_000,
+  },
 })
 
 /**
  * GET /api/agent-releases/by-token/[token]
- * Session resolve → Install meta without release secrets.
+ * Session resolve → Install meta without release secrets (org-bound + rate-limited).
  */
 export const GET = defineInternalJsonRoute({
   contract: resolveAgentReleaseByTokenContract,
   operation: resolveAgentReleaseByToken.operation,
   useCase: resolveAgentReleaseByToken,
   auth: internalSessionAuth,
-  rateLimit: NO_INTERNAL_RATE_LIMIT,
+  rateLimit: RESOLVE_BY_TOKEN_RATE_LIMIT,
   errorPolicy: internalOrchestrationErrorPolicy,
   mapInput: ({ params }) => ({ shareToken: params.token }),
   present: (result) => result,

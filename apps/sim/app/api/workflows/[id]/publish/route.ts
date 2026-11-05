@@ -35,5 +35,6 @@ export const POST = defineInternalJsonRoute({
     shareUrl: result.shareUrl,
     createdAt: result.createdAt,
     installationsMarkedPending: result.installationsMarkedPending,
+    sharesRevoked: result.sharesRevoked,
   }),
 })

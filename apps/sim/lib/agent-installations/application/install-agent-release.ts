@@ -4,9 +4,10 @@ import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
 import { and, eq, isNull } from 'drizzle-orm'
 import {
+  assertRequiredCredentialSlotsBound,
   collectAgentCredentialSlots,
-  type AgentCredentialSlot,
 } from '@/lib/agent-installations/credential-slots'
+import { assertInstallerMayResolveShare } from '@/lib/agent-installations/share-access'
 import { AuthType } from '@/lib/auth/hybrid'
 import { authorizeCredentialUseForAuth } from '@/lib/auth/credential-access'
 import { defineOperation } from '@/lib/core/application'
@@ -35,26 +36,6 @@ export interface InstallAgentReleaseResult {
   createdAt: string
   updatedAt: string
   alreadyInstalled: boolean
-}
-
-function assertRequiredSlotsBound(
-  slots: AgentCredentialSlot[],
-  bindings: Record<string, string>
-): void {
-  const missing = slots.filter((slot) => slot.required && !bindings[slot.key]?.trim())
-  if (missing.length > 0) {
-    throw new OrchestrationError(
-      'validation',
-      `Missing required credential bindings: ${missing.map((slot) => slot.key).join(', ')}`
-    )
-  }
-
-  const allowed = new Set(slots.map((slot) => slot.key))
-  for (const key of Object.keys(bindings)) {
-    if (!allowed.has(key)) {
-      throw new OrchestrationError('validation', `Unknown credential slot: ${key}`)
-    }
-  }
 }
 
 /**
@@ -102,19 +83,24 @@ export const installAgentRelease = defineAuthorizedCredentialUserUseCase({
         state: agentRelease.state,
       })
       .from(agentRelease)
-      .where(eq(agentRelease.shareToken, token))
+      .where(and(eq(agentRelease.shareToken, token), isNull(agentRelease.shareRevokedAt)))
       .limit(1)
 
     if (!release) {
       throw new OrchestrationError('not_found', 'Agent release not found for this share token')
     }
 
+    await assertInstallerMayResolveShare({
+      installerUserId,
+      workflowId: release.workflowId,
+    })
+
     const slots = collectAgentCredentialSlots(release.state as Partial<WorkflowState>)
     const credentialBindings: Record<string, string> = {}
     for (const [key, credentialId] of Object.entries(input.credentialBindings ?? {})) {
       if (credentialId?.trim()) credentialBindings[key] = credentialId.trim()
     }
-    assertRequiredSlotsBound(slots, credentialBindings)
+    assertRequiredCredentialSlotsBound(slots, credentialBindings)
 
     for (const [slotKey, credentialId] of Object.entries(credentialBindings)) {
       const access = await authorizeCredentialUseForAuth(

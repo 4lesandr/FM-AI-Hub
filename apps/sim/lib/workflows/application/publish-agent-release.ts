@@ -3,12 +3,14 @@ import { agentInstallation, agentRelease, db } from '@sim/db'
 import { createLogger } from '@sim/logger'
 import { generateId, generateShortId } from '@sim/utils/id'
 import { and, eq, inArray, isNull, max, ne } from 'drizzle-orm'
+import { redactAgentReleaseVariableValues } from '@/lib/agent-installations/redact-release-variables'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { getBaseUrl } from '@/lib/core/utils/urls'
 import { defineAuthorizedWorkflowUseCase } from '@/lib/workflows/application/authorized-workflow-use-case'
 import { workflowOperations } from '@/lib/workflows/application/operations'
 import { resolvePrincipalWorkflowContext } from '@/lib/workflows/application/principal-scope'
 import { buildWorkflowExportPayload } from '@/lib/workflows/operations/export-workflow'
+import type { Variable } from '@/stores/variables/types'
 
 const logger = createLogger('PublishAgentRelease')
 
@@ -31,15 +33,18 @@ export interface PublishAgentReleaseResult {
   createdAt: string
   /** Active installations on older releases of this workflow marked pending. */
   installationsMarkedPending: number
+  /** Older releases whose share tokens were invalidated by this Publish. */
+  sharesRevoked: number
 }
 
 /**
  * Session Publish → AgentRelease: sanitized workflow snapshot + share token URL.
  *
  * Uses the same redaction path as export (`sanitizeWorkflowForSharing` via
- * `buildWorkflowExportPayload`) so author secrets never land in the release.
- * Publish N+1 marks non-revoked installations pinned to older releases of the
- * same workflow as `pending` (Accept/Defer via /api/agent-installations).
+ * `buildWorkflowExportPayload`) so author secrets never land in the release,
+ * then strips workflow variable *values* (H1). Publish N+1 marks non-revoked
+ * installations pinned to older releases as `pending` and revokes older share
+ * tokens (H4) so only the newest Install link works.
  */
 export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
   operation: workflowOperations.publish,
@@ -53,6 +58,13 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
     const payload = await buildWorkflowExportPayload(context.workflow)
     if (!payload) {
       throw new OrchestrationError('not_found', 'Workflow state not found')
+    }
+
+    const releaseState = {
+      ...payload.state,
+      variables: redactAgentReleaseVariableValues(
+        payload.state.variables as Record<string, Variable> | undefined
+      ),
     }
 
     const releaseId = generateId()
@@ -71,7 +83,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
         id: releaseId,
         workflowId: context.workflowId,
         version,
-        state: payload.state,
+        state: releaseState,
         shareToken,
         createdBy,
         createdAt,
@@ -85,24 +97,30 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
         )
 
       let installationsMarkedPending = 0
+      let sharesRevoked = 0
       if (olderReleaseIds.length > 0) {
+        const olderIds = olderReleaseIds.map((row) => row.id)
         const marked = await tx
           .update(agentInstallation)
           .set({ updatePolicy: 'pending', updatedAt: createdAt })
           .where(
             and(
               isNull(agentInstallation.revokedAt),
-              inArray(
-                agentInstallation.releaseId,
-                olderReleaseIds.map((row) => row.id)
-              )
+              inArray(agentInstallation.releaseId, olderIds)
             )
           )
           .returning({ id: agentInstallation.id })
         installationsMarkedPending = marked.length
+
+        const revoked = await tx
+          .update(agentRelease)
+          .set({ shareRevokedAt: createdAt })
+          .where(and(inArray(agentRelease.id, olderIds), isNull(agentRelease.shareRevokedAt)))
+          .returning({ id: agentRelease.id })
+        sharesRevoked = revoked.length
       }
 
-      return { version, createdAt, installationsMarkedPending }
+      return { version, createdAt, installationsMarkedPending, sharesRevoked }
     })
 
     const shareUrl = `${getBaseUrl()}/install/${shareToken}`
@@ -113,6 +131,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       releaseId,
       version: result.version,
       installationsMarkedPending: result.installationsMarkedPending,
+      sharesRevoked: result.sharesRevoked,
       principalKind: principal.kind,
     })
 
@@ -125,6 +144,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       shareUrl,
       createdAt: result.createdAt.toISOString(),
       installationsMarkedPending: result.installationsMarkedPending,
+      sharesRevoked: result.sharesRevoked,
     }
   },
 })

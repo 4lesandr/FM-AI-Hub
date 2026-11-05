@@ -1,3 +1,4 @@
+import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { evaluateSubBlockCondition } from '@/lib/workflows/subblocks/visibility'
 import { getBlock } from '@/blocks/registry'
 import type { WorkflowState } from '@/stores/workflows/workflow/types'
@@ -10,6 +11,29 @@ export interface AgentCredentialSlot {
   field: string
   serviceId: string | null
   required: boolean
+}
+
+/**
+ * Required slots must be bound; unknown keys rejected (Install + Accept).
+ */
+export function assertRequiredCredentialSlotsBound(
+  slots: AgentCredentialSlot[],
+  bindings: Record<string, string>
+): void {
+  const missing = slots.filter((slot) => slot.required && !bindings[slot.key]?.trim())
+  if (missing.length > 0) {
+    throw new OrchestrationError(
+      'validation',
+      `Missing required credential bindings: ${missing.map((slot) => slot.key).join(', ')}`
+    )
+  }
+
+  const allowed = new Set(slots.map((slot) => slot.key))
+  for (const key of Object.keys(bindings)) {
+    if (!allowed.has(key)) {
+      throw new OrchestrationError('validation', `Unknown credential slot: ${key}`)
+    }
+  }
 }
 
 /**

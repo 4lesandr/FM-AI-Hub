@@ -5472,9 +5472,14 @@ export const agentRelease = pgTable(
       .notNull()
       .references(() => workflow.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
-    /** Sanitized workflow state (no author secrets). */
+    /** Sanitized workflow state (no author secrets; variable values redacted on Publish). */
     state: json('state').notNull(),
     shareToken: text('share_token').notNull(),
+    /**
+     * When set, Install-by-link resolve/install treat the token as gone (not_found).
+     * Publish N+1 revokes older releases' shares; authors can revoke the active share via API.
+     */
+    shareRevokedAt: timestamp('share_revoked_at'),
     createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
@@ -5486,6 +5491,7 @@ export const agentRelease = pgTable(
     shareTokenUnique: uniqueIndex('agent_release_share_token_unique').on(table.shareToken),
     workflowIdIdx: index('agent_release_workflow_id_idx').on(table.workflowId),
     createdByIdx: index('agent_release_created_by_idx').on(table.createdBy),
+    shareRevokedAtIdx: index('agent_release_share_revoked_at_idx').on(table.shareRevokedAt),
   })
 )
 

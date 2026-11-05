@@ -6,6 +6,7 @@ import {
   collectAgentCredentialSlots,
   type AgentCredentialSlot,
 } from '@/lib/agent-installations/credential-slots'
+import { assertInstallerMayResolveShare } from '@/lib/agent-installations/share-access'
 import { defineOperation } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { defineAuthorizedCredentialUserUseCase } from '@/lib/credentials/application/authorized-user-use-case'
@@ -72,12 +73,17 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
       })
       .from(agentRelease)
       .innerJoin(workflow, eq(workflow.id, agentRelease.workflowId))
-      .where(eq(agentRelease.shareToken, token))
+      .where(and(eq(agentRelease.shareToken, token), isNull(agentRelease.shareRevokedAt)))
       .limit(1)
 
     if (!row) {
       throw new OrchestrationError('not_found', 'Agent release not found for this share token')
     }
+
+    await assertInstallerMayResolveShare({
+      installerUserId: principal.userId,
+      workflowId: row.workflowId,
+    })
 
     // Any active Installation for this user+workflow (pin may lag the share-token release after Publish N+1).
     const [existing] = await db

@@ -11,6 +11,8 @@ export const publishAgentReleaseResponseSchema = z.object({
   shareUrl: z.string().url(),
   createdAt: z.string().datetime(),
   installationsMarkedPending: z.number().int().nonnegative(),
+  /** Older release share tokens invalidated by this Publish. */
+  sharesRevoked: z.number().int().nonnegative(),
 })
 
 export type PublishAgentReleaseResponse = z.output<typeof publishAgentReleaseResponseSchema>
@@ -23,5 +25,29 @@ export const publishAgentReleaseContract = defineRouteContract({
   response: {
     mode: 'json',
     schema: publishAgentReleaseResponseSchema,
+  },
+})
+
+export const revokeAgentReleaseShareResponseSchema = z.object({
+  workflowId: nonEmptyIdSchema,
+  sharesRevoked: z.number().int().positive(),
+  revokedAt: z.string().datetime(),
+})
+
+export type RevokeAgentReleaseShareResponse = z.output<
+  typeof revokeAgentReleaseShareResponseSchema
+>
+
+/**
+ * Session POST: invalidate all active Install share tokens for the workflow.
+ * Installations keep running; resolve/install by old tokens return not_found.
+ */
+export const revokeAgentReleaseShareContract = defineRouteContract({
+  method: 'POST',
+  path: '/api/workflows/[id]/revoke-share',
+  params: workflowIdParamsSchema,
+  response: {
+    mode: 'json',
+    schema: revokeAgentReleaseShareResponseSchema,
   },
 })
