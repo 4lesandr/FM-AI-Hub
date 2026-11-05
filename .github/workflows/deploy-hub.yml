@@ -1,4 +1,5 @@
-# Кнопка выкладки FM AI Hub. Push в ветку ничего не катит.
+# Кнопка выкладки FM AI Hub — как FVKS deploy-vk: push сам ничего не катит.
+# Кластер тот же, что meet/fvcs. Локальный kubectl с Air не нужен.
 name: Deploy hub (manual)
 
 on:
@@ -9,24 +10,39 @@ on:
         required: true
         type: string
       dry_run:
-        description: "Только показать план helm (без apply)"
+        description: "Только helm dry-run (без apply)"
         type: boolean
         default: true
+      image_tag:
+        description: "Опциональный тег образа app (пусто = values чарта)"
+        type: string
+        default: ""
 
 concurrency:
   group: deploy-hub
   cancel-in-progress: false
 
 jobs:
-  note:
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      # Тот же kubeconfig, что у FVKS кнопки (кластер meet). Завести в secrets репо.
+      HUB_KUBECONFIG: ${{ secrets.HUB_KUBECONFIG }}
+      VK_KUBECONFIG: ${{ secrets.VK_KUBECONFIG }}
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.33.5
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Reason
         run: |
-          echo "Reason: ${{ inputs.reason }}"
-          echo "dry_run: ${{ inputs.dry_run }}"
-          echo "Next: wire kube context (same cluster as FVKS meet) + helm upgrade -f deploy/helm/values-flomni.yaml"
-          echo "Do not enable auto-deploy on push."
-          test -f deploy/helm/values-flomni.yaml
-          test -f helm/sim/Chart.yaml
+          echo "reason=${{ inputs.reason }}"
+          echo "dry_run=${{ inputs.dry_run }}"
+      - name: Deploy hub
+        run: bash deploy/bin/ci_deploy_hub.sh

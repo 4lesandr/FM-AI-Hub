@@ -24,15 +24,17 @@ deploy/
 
 ## Порядок выкладки (/2)
 
-1. DNS `hub.fm.flomni.ru` → ingress кластера
-2. Keycloak client в `fteam` (redirect под Sim SSO callback; не ломать старый `hub` на VM до cutover)
-3. Secret `hub-secrets` в ns `hub` (BETTER_AUTH_SECRET, ENCRYPTION_KEY, …)
-4. `helm upgrade --install fm-ai-hub ./helm/sim -n hub -f deploy/helm/values-flomni.yaml`
-5. Включить SSO_* после регистрации IdP
-6. Verify: health, SSO login, websocket, бренд в UI
-7. Invite сотрудников
+Как FVKS/`fvcs`: **push + кнопка** `Deploy hub (manual)`, не kubectl с ноутбука.
 
-CI (кнопка, не push→prod) — следующий шаг в этом этапе.
+1. В GitHub secrets репо: `HUB_KUBECONFIG` (или тот же `VK_KUBECONFIG`, что у FVKS `deploy-vk`)
+2. DNS `hub.fm.flomni.ru` → ingress кластера
+3. Keycloak client в `fteam` (redirect под Sim SSO; не ломать VM `hub` до cutover)
+4. Один раз: Secret `hub-secrets` в ns `hub` (через ту же кнопку с apply или уже существующий ops-канал)
+5. Actions → **Deploy hub (manual)** → сначала `dry_run=true`, потом `false`
+6. Включить SSO_* после IdP
+7. Verify: health, SSO, websocket, бренд; invite
+
+Скрипт: `deploy/bin/ci_deploy_hub.sh` · values: `deploy/helm/values-flomni.yaml`
 
 ## Mac
 

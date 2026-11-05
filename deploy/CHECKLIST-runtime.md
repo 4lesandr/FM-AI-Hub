@@ -13,12 +13,12 @@
 | --- | --- | --- | --- |
 | 1 | DNS A/CNAME `hub.fm.flomni.ru` → ingress meet-кластера | админ / Александр | open |
 | 2 | Keycloak client в `fteam` (SSO callback Sim; не ломать VM `hub` до cutover) | админ Keycloak | open |
-| 3 | ns `hub` + secret `hub-secrets` | ops с `kfvks` | open |
-| 4 | `helm upgrade --install` с values-flomni | ops | open |
-| 5 | Egress к моделям (amnezia), если 403 | ops | open |
-| 6 | Verify: health, SSO, websocket, бренд | ops | open |
-| 7 | Invite первых пользователей | Александр | open |
-| 8 | CI кнопка (workflow_dispatch), не auto-push | следующий коммит | open |
+| 3 | Secret `HUB_KUBECONFIG` (или `VK_KUBECONFIG`) в GitHub `4lesandr/FM-AI-Hub` | Александр (копия с FVKS) | open |
+| 4 | ns `hub` + secret `hub-secrets` | CI apply / ops | open |
+| 5 | Кнопка **Deploy hub** `dry_run` → apply | Александр | open (workflow готов) |
+| 6 | Egress к моделям (amnezia), если 403 | ops | open |
+| 7 | Verify: health, SSO, websocket, бренд | ops | open |
+| 8 | Invite первых пользователей | Александр | open |
 
 ## Не делать на Air
 
