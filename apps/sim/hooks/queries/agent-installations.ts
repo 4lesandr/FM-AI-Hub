@@ -5,6 +5,8 @@ import { requestJson } from '@/lib/api/client/request'
 import {
   acceptAgentInstallationUpdateContract,
   deferAgentInstallationUpdateContract,
+  executeAgentInstallationContract,
+  type ExecuteAgentInstallationResponse,
   installAgentReleaseContract,
   type InstallAgentReleaseResponse,
   listPendingAgentInstallationUpdatesContract,
@@ -111,5 +113,30 @@ export function useRevokeAgentInstallation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: agentInstallationKeys.all })
     },
+  })
+}
+
+/** Session execute of a pinned Installation under installer identity (#6). */
+export function useExecuteAgentInstallation() {
+  return useMutation({
+    mutationFn: ({
+      installationId,
+      input,
+      triggerBlockId,
+      signal,
+    }: {
+      installationId: string
+      input?: unknown
+      triggerBlockId?: string
+      signal?: AbortSignal
+    }): Promise<ExecuteAgentInstallationResponse> =>
+      requestJson(executeAgentInstallationContract, {
+        params: { id: installationId },
+        body: {
+          input,
+          ...(triggerBlockId ? { triggerBlockId } : {}),
+        },
+        signal,
+      }),
   })
 }

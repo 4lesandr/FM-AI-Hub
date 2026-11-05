@@ -294,19 +294,22 @@ function handleInvitationRedirects(
 }
 
 /**
- * App Store Install-by-link: unauthenticated visitors go to login with callback back to /install/{token}.
+ * App Store Install-by-link + Installation chat: unauthenticated visitors go to
+ * login with callback back to `/install/{token}` or `/installations/{id}/chat`.
  */
 function handleInstallRedirects(
   request: NextRequest,
   hasActiveSession: boolean
 ): NextResponse | null {
-  if (!request.nextUrl.pathname.startsWith('/install/')) {
+  const { pathname, search } = request.nextUrl
+  const isInstallLink = pathname.startsWith('/install/')
+  const isInstallationChat = pathname.startsWith('/installations/')
+  if (!isInstallLink && !isInstallationChat) {
     return null
   }
 
-  if (!hasActiveSession && !request.nextUrl.search.includes('callbackUrl')) {
-    const shareToken = request.nextUrl.pathname.split('/').pop()
-    const callbackParam = encodeURIComponent(`/install/${shareToken ?? ''}`)
+  if (!hasActiveSession && !search.includes('callbackUrl')) {
+    const callbackParam = encodeURIComponent(`${pathname}${search}`)
     return NextResponse.redirect(new URL(`/login?callbackUrl=${callbackParam}`, request.url))
   }
 
@@ -538,6 +541,7 @@ export const config = {
     '/signup',
     '/invite/:path*', // Match invitation routes
     '/install/:path*', // App Store Install-by-link
+    '/installations/:path*', // Installation chat (installer identity)
     // Runtime CORS. The desktop's raw upload routes and the realtime relay's document persists are
     // left out: running the proxy makes Next buffer the body, cutting it off at its 10 MB proxy
     // limit, and those bodies are whole files or document snapshots.

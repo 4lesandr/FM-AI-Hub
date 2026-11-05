@@ -1,6 +1,9 @@
 'use client'
 
+import { Badge, Banner, Button } from '@sim/emcn'
+import { useRouter } from 'next/navigation'
 import { useSession } from '@/lib/auth/client'
+import { installationChatPath } from '@/lib/navigation/installation-paths'
 import {
   useAcceptAgentInstallationUpdate,
   useDeferAgentInstallationUpdate,
@@ -9,9 +12,10 @@ import {
 
 /**
  * Session badge for pending agent Installation updates (Publish N+1 channel).
- * Minimal Affordance — no catalog; Accept/Defer only.
+ * Uses emcn Banner/Badge/Button — same kit as the rest of Sim chrome.
  */
 export function AgentInstallationUpdatesBanner() {
+  const router = useRouter()
   const { data: session, isPending } = useSession()
   const enabled = Boolean(session?.user) && !isPending
   const { data, isLoading } = usePendingAgentInstallationUpdates({ enabled })
@@ -26,63 +30,56 @@ export function AgentInstallationUpdatesBanner() {
   const busy = acceptMutation.isPending || deferMutation.isPending
 
   return (
-    <div
-      role='status'
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 60,
-        background: '#fff8e1',
-        borderBottom: '1px solid #c9a227',
-        padding: '10px 16px',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: 14,
-      }}
-    >
-      {updates.map((update) => (
-        <div
-          key={update.installationId}
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 10,
-            alignItems: 'center',
-            marginBottom: updates.length > 1 ? 8 : 0,
-          }}
-        >
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '2px 8px',
-              borderRadius: 4,
-              background: '#c9a227',
-              color: '#1a1a1a',
-              fontWeight: 600,
-              fontSize: 12,
-            }}
+    <Banner role='status' className='border-b border-[var(--border)]'>
+      <div className='mx-auto flex max-w-[1400px] flex-col gap-2'>
+        {updates.map((update) => (
+          <div
+            key={update.installationId}
+            className='flex flex-wrap items-center gap-3 text-[var(--text-body)] text-small'
           >
-            есть обновление
-          </span>
-          <span>
-            <strong>{update.workflowName}</strong> · v{update.pinnedVersion} → v
-            {update.latestVersion}
-          </span>
-          <button
-            type='button'
-            disabled={busy}
-            onClick={() => void acceptMutation.mutateAsync(update.installationId)}
-          >
-            Accept
-          </button>
-          <button
-            type='button'
-            disabled={busy}
-            onClick={() => void deferMutation.mutateAsync(update.installationId)}
-          >
-            Defer
-          </button>
-        </div>
-      ))}
-    </div>
+            <Badge variant='amber' size='sm'>
+              есть обновление
+            </Badge>
+            <span className='min-w-0'>
+              <span className='text-[var(--text-primary)]'>{update.workflowName}</span>
+              {' · '}
+              v{update.pinnedVersion} → v{update.latestVersion}
+            </span>
+            <div className='ml-auto flex flex-wrap items-center gap-2'>
+              <Button
+                type='button'
+                size='sm'
+                variant='default'
+                disabled={busy}
+                onClick={() => void acceptMutation.mutateAsync(update.installationId)}
+              >
+                Accept
+              </Button>
+              <Button
+                type='button'
+                size='sm'
+                variant='ghost'
+                disabled={busy}
+                onClick={() => void deferMutation.mutateAsync(update.installationId)}
+              >
+                Defer
+              </Button>
+              <Button
+                type='button'
+                size='sm'
+                variant='ghost'
+                onClick={() =>
+                  router.push(
+                    installationChatPath(update.installationId, { title: update.workflowName })
+                  )
+                }
+              >
+                Чат
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Banner>
   )
 }

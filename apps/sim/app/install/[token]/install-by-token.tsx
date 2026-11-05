@@ -1,11 +1,23 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AuthButton as Chip,
+  AuthSelect as ChipSelect,
+  type AuthSelectOption as ChipSelectOption,
+  AuthInput,
+  AuthLabel as Label,
+  AuthStack,
+} from '@sim/auth-ui'
+import { cn } from '@sim/emcn'
 import { useParams, useRouter } from 'next/navigation'
 import { ApiClientError } from '@/lib/api/client/errors'
 import { useSession } from '@/lib/auth/client'
-import { APP_ENTRY_PATH } from '@/lib/navigation/paths'
+import { installationChatPath } from '@/lib/navigation/installation-paths'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
+import { AuthFormMessage, AuthHeader, AuthSubmitButton } from '@/app/(auth)/components'
+import { AUTH_BUTTON_CLASS } from '@/app/(auth)/components/constants'
+import InstallLayout from '@/app/install/components/layout'
 import {
   useAcceptAgentInstallationUpdate,
   useAgentReleaseByToken,
@@ -17,7 +29,7 @@ import { useWorkspacesQuery } from '@/hooks/queries/workspace'
 
 /**
  * Install-by-link page for Publish share URLs (`/install/{token}`).
- * No catalog / fork UX — only «Поставить себе», Accept/Defer, and revoke.
+ * Auth-shell + auth-ui controls — same kit as invite/CLI consent, not a debug form.
  */
 export function InstallByToken() {
   const params = useParams<{ token: string }>()
@@ -52,6 +64,15 @@ export function InstallByToken() {
     if (first && !workspaceId) setWorkspaceId(first)
   }, [meta, workspacesQuery.data, workspaceId])
 
+  const workspaceOptions = useMemo<ChipSelectOption[]>(
+    () =>
+      (workspacesQuery.data ?? []).map((ws) => ({
+        label: ws.name,
+        value: ws.id,
+      })),
+    [workspacesQuery.data]
+  )
+
   const updatePending =
     meta?.installation?.updatePolicy === 'pending' ||
     meta?.installation?.updatePolicy === 'deferred'
@@ -60,6 +81,8 @@ export function InstallByToken() {
     acceptMutation.isPending ||
     deferMutation.isPending ||
     revokeMutation.isPending
+
+  const installationId = meta?.installation?.id ?? doneId
 
   const errorMessage =
     formError ??
@@ -89,6 +112,10 @@ export function InstallByToken() {
         ? 'Не удалось отозвать установку'
         : null)
 
+  const openChat = (id: string) => {
+    router.push(installationChatPath(id, { title: meta?.workflowName }))
+  }
+
   const onInstall = async () => {
     if (!token || !workspaceId.trim()) {
       setFormError('Выберите workspace')
@@ -102,6 +129,7 @@ export function InstallByToken() {
         credentialBindings: bindings,
       })
       setDoneId(result.installationId)
+      router.push(installationChatPath(result.installationId, { title: meta?.workflowName }))
     } catch {
       // surfaced via mutation error
     }
@@ -129,7 +157,6 @@ export function InstallByToken() {
   }
 
   const onRevoke = async () => {
-    const installationId = meta?.installation?.id ?? doneId
     if (!installationId) return
     setFormError(null)
     try {
@@ -141,164 +168,212 @@ export function InstallByToken() {
   }
 
   if (sessionPending) {
-    return <p style={{ padding: 24 }}>Загрузка сессии…</p>
+    return (
+      <InstallLayout>
+        <AuthStack>
+          <AuthHeader title='Поставить себе' description='Загрузка сессии…' />
+        </AuthStack>
+      </InstallLayout>
+    )
   }
 
   if (!session?.user) {
     return (
-      <main style={pageStyle}>
-        <h1 style={titleStyle}>Поставить себе</h1>
-        <p style={{ marginBottom: 16 }}>Войдите, чтобы установить этого агента себе.</p>
-        <button
-          type='button'
-          onClick={() => router.push(buildAuthCrossLink('/login', { callbackUrl }))}
-        >
-          Войти
-        </button>
-      </main>
+      <InstallLayout>
+        <AuthStack>
+          <AuthHeader
+            title='Поставить себе'
+            description='Войдите, чтобы установить этого агента себе.'
+          />
+          <AuthSubmitButton
+            type='button'
+            loadingLabel=''
+            onClick={() => router.push(buildAuthCrossLink('/login', { callbackUrl }))}
+          >
+            Войти
+          </AuthSubmitButton>
+        </AuthStack>
+      </InstallLayout>
     )
   }
 
   return (
-    <main style={pageStyle}>
-      <h1 style={titleStyle}>Поставить себе</h1>
-      {errorMessage ? <p style={{ color: '#b00020' }}>{errorMessage}</p> : null}
-      {releaseQuery.isLoading && !meta ? <p>Открываем ссылку…</p> : null}
+    <InstallLayout>
+      <AuthStack>
+        <AuthHeader
+          title='Поставить себе'
+          description={
+            meta
+              ? `${meta.workflowName} · v${meta.version}${
+                  meta.workflowDescription ? ` — ${meta.workflowDescription}` : ''
+                }`
+              : releaseQuery.isLoading
+                ? 'Открываем ссылку…'
+                : 'Установка агента по ссылке'
+          }
+        />
 
-      {meta ? (
-        <>
-          <p style={{ marginBottom: 4 }}>
-            <strong>{meta.workflowName}</strong> · v{meta.version}
-          </p>
-          {meta.workflowDescription ? (
-            <p style={{ marginBottom: 16, opacity: 0.8 }}>{meta.workflowDescription}</p>
-          ) : null}
+        {errorMessage ? (
+          <AuthFormMessage type='error' align='center'>
+            {errorMessage}
+          </AuthFormMessage>
+        ) : null}
 
-          {updatePending && meta.installation ? (
-            <section
-              style={{
-                marginBottom: 20,
-                padding: '12px 14px',
-                border: '1px solid #c9a227',
-                background: '#fff8e1',
-                borderRadius: 6,
-              }}
-              aria-live='polite'
-            >
-              <p style={{ margin: '0 0 8px', fontWeight: 600 }}>есть обновление</p>
-              <p style={{ margin: '0 0 12px', opacity: 0.85, fontSize: 14 }}>
-                У вас v{meta.installation.pinnedVersion}
-                {meta.version !== meta.installation.pinnedVersion
-                  ? `, доступна v${meta.version}`
-                  : ''}
-                . Принять новую версию или отложить?
-              </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type='button' disabled={busy} onClick={() => void onAccept()}>
-                  {acceptMutation.isPending ? 'Принимаем…' : 'Accept'}
-                </button>
-                <button type='button' disabled={busy} onClick={() => void onDefer()}>
-                  {deferMutation.isPending ? 'Откладываем…' : 'Defer'}
-                </button>
-              </div>
-            </section>
-          ) : null}
+        {updatePending && meta?.installation ? (
+          <div className='au:w-full au:space-y-3 au:rounded-md au:border au:border-[var(--auth-border)] au:bg-[var(--auth-surface)] au:p-4'>
+            <p className='au:text-[var(--auth-primary)] au:text-control au:font-medium'>
+              Есть обновление
+            </p>
+            <p className='au:text-[var(--auth-secondary)] au:text-caption'>
+              У вас v{meta.installation.pinnedVersion}
+              {meta.version !== meta.installation.pinnedVersion
+                ? `, доступна v${meta.version}`
+                : ''}
+              . Принять новую версию или отложить?
+            </p>
+            <div className='au:flex au:flex-col au:gap-2'>
+              <AuthSubmitButton
+                type='button'
+                disabled={busy}
+                loading={acceptMutation.isPending}
+                loadingLabel='Принимаем…'
+                onClick={() => void onAccept()}
+              >
+                Accept
+              </AuthSubmitButton>
+              <Chip
+                fullWidth
+                disabled={busy}
+                onClick={() => void onDefer()}
+                className={cn(AUTH_BUTTON_CLASS, 'au:border au:border-[var(--auth-border)]')}
+              >
+                {deferMutation.isPending ? 'Откладываем…' : 'Defer'}
+              </Chip>
+            </div>
+          </div>
+        ) : null}
 
-          {!updatePending ? (
-            <>
-              <label style={{ display: 'block', marginBottom: 12 }}>
+        {!updatePending && meta ? (
+          <div className='au:w-full au:space-y-[var(--auth-group-gap)]'>
+            <div className='au:flex au:flex-col au:gap-2'>
+              <Label
+                htmlFor='install-workspace'
+                className='au:text-[var(--auth-secondary)] au:text-control'
+              >
                 Workspace
-                <select
-                  value={workspaceId}
-                  onChange={(event) => setWorkspaceId(event.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 4, padding: 6 }}
-                >
-                  <option value='' disabled>
-                    {workspacesQuery.isLoading ? 'Загрузка…' : 'Выберите workspace'}
-                  </option>
-                  {(workspacesQuery.data ?? []).map((ws) => (
-                    <option key={ws.id} value={ws.id}>
-                      {ws.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              </Label>
+              <ChipSelect
+                id='install-workspace'
+                aria-label='Workspace'
+                options={workspaceOptions}
+                value={workspaceId || undefined}
+                onChange={setWorkspaceId}
+                disabled={busy || workspacesQuery.isLoading}
+                displayLabel={
+                  workspacesQuery.isLoading && !workspaceId ? 'Загрузка…' : undefined
+                }
+                placeholder='Выберите workspace'
+                searchable={workspaceOptions.length > 8}
+                searchPlaceholder='Поиск workspace'
+                fullWidth
+                dropdownWidth='trigger'
+              />
+            </div>
 
-              {meta.credentialSlots.length > 0 ? (
-                <fieldset style={{ marginBottom: 16 }}>
-                  <legend>Ваши credentials</legend>
-                  {meta.credentialSlots.map((slot) => (
-                    <label key={slot.key} style={{ display: 'block', marginBottom: 8 }}>
+            {meta.credentialSlots.length > 0 ? (
+              <div className='au:space-y-3'>
+                <p className='au:text-[var(--auth-secondary)] au:text-control'>Ваши credentials</p>
+                {meta.credentialSlots.map((slot) => (
+                  <div key={slot.key} className='au:flex au:flex-col au:gap-2'>
+                    <Label
+                      htmlFor={`cred-${slot.key}`}
+                      className='au:text-[var(--auth-secondary)] au:text-caption'
+                    >
                       {slot.blockName} / {slot.field}
                       {slot.serviceId ? ` (${slot.serviceId})` : ''}
                       {slot.required ? ' *' : ''}
-                      <input
-                        value={bindings[slot.key] ?? ''}
-                        onChange={(event) =>
-                          setBindings((prev) => ({ ...prev, [slot.key]: event.target.value }))
-                        }
-                        style={{ display: 'block', width: '100%', marginTop: 4, padding: 6 }}
-                        placeholder='credential id'
-                      />
-                    </label>
-                  ))}
-                </fieldset>
-              ) : (
-                <p style={{ marginBottom: 16, opacity: 0.7 }}>Credentials не требуются.</p>
-              )}
-
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button type='button' disabled={busy || !workspaceId} onClick={() => void onInstall()}>
-                  {installMutation.isPending
-                    ? 'Устанавливаем…'
-                    : doneId
-                      ? 'Обновить установку'
-                      : 'Поставить себе'}
-                </button>
-                {doneId || meta.installation ? (
-                  <button type='button' disabled={busy} onClick={() => void onRevoke()}>
-                    {revokeMutation.isPending ? 'Отзываем…' : 'Отозвать установку'}
-                  </button>
-                ) : null}
-                {doneId ? (
-                  <button type='button' onClick={() => router.push(APP_ENTRY_PATH)}>
-                    На главную
-                  </button>
-                ) : null}
+                    </Label>
+                    <AuthInput
+                      id={`cred-${slot.key}`}
+                      value={bindings[slot.key] ?? ''}
+                      onChange={(event) =>
+                        setBindings((prev) => ({ ...prev, [slot.key]: event.target.value }))
+                      }
+                      placeholder='credential id'
+                      disabled={busy}
+                    />
+                  </div>
+                ))}
               </div>
-            </>
-          ) : null}
+            ) : (
+              <p className='au:text-[var(--auth-secondary)] au:text-caption'>
+                Credentials не требуются.
+              </p>
+            )}
 
-          {updatePending && meta.installation ? (
-            <div style={{ marginTop: 16 }}>
-              <button type='button' disabled={busy} onClick={() => void onRevoke()}>
-                {revokeMutation.isPending ? 'Отзываем…' : 'Отозвать установку'}
-              </button>
+            <div className='au:w-full au:space-y-2'>
+              <AuthSubmitButton
+                type='button'
+                disabled={busy || !workspaceId}
+                loading={installMutation.isPending}
+                loadingLabel='Устанавливаем…'
+                onClick={() => void onInstall()}
+              >
+                {doneId || meta.installation ? 'Обновить установку' : 'Поставить себе'}
+              </AuthSubmitButton>
+
+              {installationId ? (
+                <>
+                  <Chip
+                    fullWidth
+                    disabled={busy}
+                    onClick={() => openChat(installationId)}
+                    className={cn(AUTH_BUTTON_CLASS, 'au:border au:border-[var(--auth-border)]')}
+                  >
+                    Открыть чат
+                  </Chip>
+                  <Chip
+                    fullWidth
+                    disabled={busy}
+                    onClick={() => void onRevoke()}
+                    className={cn(AUTH_BUTTON_CLASS, 'au:border au:border-[var(--auth-border)]')}
+                  >
+                    {revokeMutation.isPending ? 'Отзываем…' : 'Отозвать установку'}
+                  </Chip>
+                </>
+              ) : null}
             </div>
-          ) : null}
 
-          {doneId && !updatePending ? (
-            <p style={{ marginTop: 12, opacity: 0.7 }}>Установлено: {doneId}</p>
-          ) : null}
-          {meta.installation && !updatePending ? (
-            <p style={{ marginTop: 8, opacity: 0.7 }}>
-              Уже установлено · v{meta.installation.pinnedVersion} ·{' '}
-              {meta.installation.updatePolicy}
-            </p>
-          ) : null}
-        </>
-      ) : null}
-    </main>
+            {meta.installation && !updatePending ? (
+              <p className='au:text-center au:text-[var(--auth-secondary)] au:text-caption'>
+                Уже установлено · v{meta.installation.pinnedVersion} ·{' '}
+                {meta.installation.updatePolicy}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {updatePending && installationId ? (
+          <div className='au:w-full au:space-y-2'>
+            <Chip
+              fullWidth
+              disabled={busy}
+              onClick={() => openChat(installationId)}
+              className={cn(AUTH_BUTTON_CLASS, 'au:border au:border-[var(--auth-border)]')}
+            >
+              Открыть чат
+            </Chip>
+            <Chip
+              fullWidth
+              disabled={busy}
+              onClick={() => void onRevoke()}
+              className={cn(AUTH_BUTTON_CLASS, 'au:border au:border-[var(--auth-border)]')}
+            >
+              {revokeMutation.isPending ? 'Отзываем…' : 'Отозвать установку'}
+            </Chip>
+          </div>
+        ) : null}
+      </AuthStack>
+    </InstallLayout>
   )
-}
-
-const pageStyle: CSSProperties = {
-  padding: 24,
-  maxWidth: 560,
-  fontFamily: 'system-ui, sans-serif',
-}
-
-const titleStyle: CSSProperties = {
-  fontSize: 20,
-  marginBottom: 8,
 }
