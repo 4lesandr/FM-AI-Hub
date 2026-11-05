@@ -37,6 +37,10 @@ deploy/
 Скрипт: `deploy/bin/ci_deploy_hub.sh` · values: `deploy/helm/values-flomni.yaml`  
 Cutover FMAH→Sim: [`CUTOVER-fmah-to-sim.md`](CUTOVER-fmah-to-sim.md) (ns `hub` сейчас занят `hub-tenant`).
 
+## Localdev (/2b)
+
+Лёгкий стенд на готовом `.next` (без turbo/tsc и без full rebuild): [`LOCALDEV.md`](LOCALDEV.md) · `deploy/bin/localdev-up.sh`.
+
 ## Mac
 
 Не запускать `bun run type-check` / `turbo type-check` локально. Push: `HUSKY=0 git push` если хук тянет type-check.
