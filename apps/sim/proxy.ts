@@ -302,6 +302,7 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
   const isWebhookEndpoint =
     pathname.startsWith('/api/webhooks/trigger/') ||
     pathname.startsWith('/api/webhooks/tiktok') ||
+    pathname.startsWith('/api/webhooks/fvks') ||
     pathname.startsWith('/api/webhooks/agentmail')
   const isMcpEndpoint = pathname.startsWith('/api/mcp/')
   const isDiscoveryEndpoint =

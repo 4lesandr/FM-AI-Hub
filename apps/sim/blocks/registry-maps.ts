@@ -96,6 +96,7 @@ import {
 import { FivetranBlock, FivetranBlockMeta } from '@/blocks/blocks/fivetran'
 import { FlintBlock, FlintBlockMeta } from '@/blocks/blocks/flint'
 import { FunctionBlock } from '@/blocks/blocks/function'
+import { FvksBlock, FvksBlockMeta } from '@/blocks/blocks/fvks'
 import { GammaBlock, GammaBlockMeta } from '@/blocks/blocks/gamma'
 import { GenericWebhookBlock } from '@/blocks/blocks/generic_webhook'
 import {
@@ -507,6 +508,7 @@ export const BLOCK_REGISTRY: Record<string, BlockConfig> = {
   fivetran: FivetranBlock,
   flint: FlintBlock,
   function: FunctionBlock,
+  fvks: FvksBlock,
   gamma: GammaBlock,
   generic_webhook: GenericWebhookBlock,
   github: GitHubBlock,
@@ -868,6 +870,7 @@ export const BLOCK_META_REGISTRY: Record<string, BlockMeta> = {
   fireflies_v2: FirefliesV2BlockMeta,
   fivetran: FivetranBlockMeta,
   flint: FlintBlockMeta,
+  fvks: FvksBlockMeta,
   gamma: GammaBlockMeta,
   github: GitHubBlockMeta,
   github_v2: GitHubV2BlockMeta,

@@ -70,6 +70,23 @@ REDIS_URL=redis://127.0.0.1:6380
 Миграции (только если схема пустая) — через compose `migrations` или точечный `bun run db:migrate` в `packages/db`.  
 App + realtime — снова на хосте (`bun run start`), **не** поднимать сервис `simstudio` из compose (он тянет image build).
 
+## FVKS token-exchange (/2c) — optional
+
+Не требуется для подъёма стенда. Для ручного connect после SSO:
+
+```
+HUB_OIDC_ISSUER=…
+HUB_OIDC_CLIENT_ID=…
+HUB_OIDC_CLIENT_SECRET=…
+HUB_IDP_AUDIENCES=fvks=meet
+FVKS_MCP_URL=…
+FVKS_MCP_CLIENT_ID=…
+FVKS_MCP_CLIENT_SECRET=…
+```
+
+Затем (сессия браузера): `POST /api/fvks/connect` → в ответе `grant_id`.  
+Дизайн: `docs/deploy/token-exchange-fvks-mcp.md`. Compose/start scripts не менять.
+
 ## Проверка
 
 ```bash

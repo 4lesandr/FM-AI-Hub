@@ -1,0 +1,9 @@
+# Host-dev: Docker only for infra. App + realtime run on the host via bun.
+# Usage: docker compose -f docker-compose.local.yml -f docker-compose.host-dev.yml up -d db redis
+services:
+  db:
+    ports:
+      - '5433:5432'
+  redis:
+    ports:
+      - '6380:6379'

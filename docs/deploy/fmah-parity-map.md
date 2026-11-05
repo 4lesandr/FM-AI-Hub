@@ -142,14 +142,17 @@ Env (имена, без значений): `HUB_OIDC_ISSUER`, `HUB_OIDC_CLIENT_I
 
 | Есть | Gap |
 | --- | --- |
-| MCP OAuth authorization_code + refresh (`lib/mcp/oauth`) | **Нет** RFC 8693 Keycloak exchange |
-| Credential storage / OAuth popup UX | **Нет** jwt-bearer к FVKS |
-| SSO better-auth / org IdP (общий стек Sim) | Нет `HUB_IDP_AUDIENCES`-эквивалента и auto-connect on sign-in к meet |
+| MCP OAuth authorization_code + refresh (`lib/mcp/oauth`) | Auto sign-in hook ещё не вызван |
+| `/2c` `lib/fvks/*` + `POST /api/fvks/connect` | Live secrets + SSO account token в стенде |
+| Env `HUB_OIDC_*`, `HUB_IDP_AUDIENCES`, `FVKS_MCP_*` | Таблица `fvks_connection` (сейчас env ciphertext + Redis grant index) |
+| SSO better-auth / org IdP | Полный Agents `POST /api/app/v1/connect` — позже `/2e` |
+
+Дизайн: `docs/deploy/token-exchange-fvks-mcp.md`.
 
 ### Перенос
 
-1. После SSO в Sim: exchange → jwt-bearer → сохранить токены + **grant_id** (критично для webhook routing).
-2. Эквивалент `POST …/connect` для сервера FVKS (если панель остаётся).
+1. После SSO в Sim: exchange → jwt-bearer → сохранить токены + **grant_id** (критично для webhook routing). **Код `/2c`.**
+2. Эквивалент `POST …/connect` для сервера FVKS: `POST /api/fvks/connect` `{ subject_token }` (**есть**); панель Agents — `/2e`.
 3. Realm: право клиента хаба на token-exchange к `meet` (и др.) — уже для FMAH; перенастроить redirect/client под Sim, не ломая FMAH до cutover.
 
 ---
@@ -242,9 +245,9 @@ Cutover ops: `sim-sandbox/deploy/CUTOVER-fmah-to-sim.md` (secrets пересоб
 | 4 | `list_events` catch-up | done | нет | Нужен до снятия FMAH (дыра ~40м+) |
 | 5 | Trigger filters / `$me` / catalog | done | нет | MVP: type-only; filters — next |
 | 6 | Stop-on-event / concurrency | done | частичный | По приоритету продукта |
-| 7 | Keycloak token-exchange → jwt-bearer | done | **нет** | **Обязателен** для auto-connect |
+| 7 | Keycloak token-exchange → jwt-bearer | done | **код `/2c`** | Нужен live exchange + secrets |
 | 8 | Manual MCP OAuth + refresh | done | есть | Ок как fallback |
-| 9 | MCP tools от имени пользователя | done | generic MCP | Привязать FVKS server + installer creds |
+| 9 | MCP tools от имени пользователя | done | generic MCP + `getFvksMcpAuthHeaders` | Привязать tool runtime к stored grant |
 | 10 | Agents API panel в meet | done | **нет** | **Обязателен** или смена FVKS |
 | 11 | Live agent in LiveKit room | done | **нет** | Отдельный slice; голосовые агенты |
 | 12 | Install-by-link identity | FMAH shares | WIP `/3` | См. as-is-sim-api-hooks; не блокер events |

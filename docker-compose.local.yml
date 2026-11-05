@@ -3,6 +3,8 @@ services:
     env_file:
       - path: .env
         required: false
+    image: ghcr.io/simstudioai/simstudio:latest
+    pull_policy: never
     build:
       context: .
       dockerfile: docker/app.Dockerfile
@@ -18,6 +20,7 @@ services:
       - BETTER_AUTH_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-secret-at-least-32-characters-long}
+      - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-http://127.0.0.1:3000,http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-encryption-key-at-least-32-chars}
       - API_ENCRYPTION_KEY=${API_ENCRYPTION_KEY:-}
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-dev-internal-api-secret-min-32-chars}
@@ -26,7 +29,12 @@ services:
       - MSHIP_SYSPROMPT_OVERRIDE=${MSHIP_SYSPROMPT_OVERRIDE:-}
       - NEXT_PUBLIC_CHAT_DISABLED=${NEXT_PUBLIC_CHAT_DISABLED:-}
       - SIM_AGENT_API_URL=${SIM_AGENT_API_URL:-}
-      - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
+      # Empty by default: a set OLLAMA_URL makes shouldRequireApiKeyForModel treat
+      # unknown/cloud model ids as local Ollama names and drop the Agent apiKey
+      # from serialization, which then fails as "API key is required for openai …".
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - FVKS_EVENTS_TOKEN=${FVKS_EVENTS_TOKEN:-}
+      - FVKS_EVENTS_SIGNING_SECRET=${FVKS_EVENTS_SIGNING_SECRET:-}
       - SOCKET_SERVER_URL=${SOCKET_SERVER_URL:-http://realtime:3002}
       - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-}
     # Lets a workflow reach a service on the Docker host. Reaching it also

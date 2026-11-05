@@ -11,7 +11,13 @@
 | `INTERNAL_API_SECRET` | если чарт/прокси требует |
 | `DATABASE_URL` / postgres keys | по values stateful |
 | `REDIS_URL` | по values |
-| OIDC client secret | после клиента Keycloak `fteam` |
+| OIDC / SSO client secret | после клиента Keycloak (`fteam` / hub) |
+| `HUB_OIDC_ISSUER` | realm issuer (или полагаться на `SSO_ISSUER`) |
+| `HUB_OIDC_CLIENT_ID` / `HUB_OIDC_CLIENT_SECRET` | клиент с token-exchange |
+| `HUB_IDP_AUDIENCES` | например `fvks=meet` |
+| `FVKS_MCP_URL` | MCP Встреч |
+| `FVKS_MCP_CLIENT_ID` / `FVKS_MCP_CLIENT_SECRET` | preregistered Hub client у FVKS |
+| `FVKS_EVENTS_TOKEN` / `FVKS_EVENTS_SIGNING_SECRET` | ingress событий |
 
 Создание (из CI/ops с kubeconfig, не с Air без API):
 
