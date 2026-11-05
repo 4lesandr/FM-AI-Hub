@@ -296,6 +296,23 @@ export const workflowOperations = {
     contentDelivery: 'none',
     ...ALL_WORKFLOW_PRINCIPAL_POLICY,
   }),
+  /**
+   * App Store Publish: immutable AgentRelease + share token. Session-only MVP;
+   * any writer may issue — not gated by deploy.api (deploy activates the author's
+   * own runtime; publish editions a sanitized snapshot for others to Install).
+   *
+   * permission-group-exempt: publishing a redacted edition is workspace-role gated
+   * the same way as export/import; Install identity is the installer, not the author
+   */
+  publish: defineWorkspaceOperation({
+    id: 'workflows.publish',
+    oauthScope: 'api:write',
+    minimumRole: 'write',
+    workspaceApiKey: 'deny',
+    capability: 'none',
+    contentDelivery: 'none',
+    principalKinds: ['session'],
+  }),
   deploy: defineWorkspaceOperation({
     id: 'workflows.deploy',
     oauthScope: 'api:write',
