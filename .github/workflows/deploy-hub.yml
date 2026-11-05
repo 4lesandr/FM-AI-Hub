@@ -1,0 +1,32 @@
+# Кнопка выкладки FM AI Hub. Push в ветку ничего не катит.
+name: Deploy hub (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Зачем выкатываем"
+        required: true
+        type: string
+      dry_run:
+        description: "Только показать план helm (без apply)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-hub
+  cancel-in-progress: false
+
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: |
+          echo "Reason: ${{ inputs.reason }}"
+          echo "dry_run: ${{ inputs.dry_run }}"
+          echo "Next: wire kube context (same cluster as FVKS meet) + helm upgrade -f deploy/helm/values-flomni.yaml"
+          echo "Do not enable auto-deploy on push."
+          test -f deploy/helm/values-flomni.yaml
+          test -f helm/sim/Chart.yaml
