@@ -16,6 +16,10 @@ import {
   revokeAgentInstallationContract,
 } from '@/lib/api/contracts/agent-installations'
 import {
+  publishAgentReleaseContract,
+  type PublishAgentReleaseResponse,
+} from '@/lib/api/contracts/agent-releases'
+import {
   AGENT_INSTALLATION_UPDATES_STALE_TIME,
   AGENT_RELEASE_BY_TOKEN_STALE_TIME,
   agentInstallationKeys,
@@ -72,6 +76,20 @@ export function useInstallAgentRelease() {
         }),
       ])
       return result
+    },
+  })
+}
+
+/** Session Publish → AgentRelease + Install share URL (`/install/{token}`). */
+export function usePublishAgentRelease() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (workflowId: string): Promise<PublishAgentReleaseResponse> =>
+      requestJson(publishAgentReleaseContract, {
+        params: { id: workflowId },
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: agentInstallationKeys.updates() })
     },
   })
 }

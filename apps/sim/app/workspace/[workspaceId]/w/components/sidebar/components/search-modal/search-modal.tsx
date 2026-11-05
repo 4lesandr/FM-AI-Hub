@@ -340,11 +340,22 @@ function SearchModalContent({
       context: 'workflow',
       run: invoke('run-workflow'),
     })
+    if (canEdit) {
+      list.push({
+        id: 'publish-workflow',
+        name: 'Publish workflow',
+        keywords: 'install share link agent release edition',
+        exactQueries: ['publish'],
+        icon: Send,
+        context: 'workflow',
+        run: invoke('publish-workflow'),
+      })
+    }
     if (canAdmin) {
       list.push({
         id: 'deploy-workflow',
         name: 'Deploy workflow',
-        keywords: 'ship release publish api',
+        keywords: 'ship release api',
         exactQueries: ['deploy'],
         icon: Rocket,
         context: 'workflow',
