@@ -222,3 +222,29 @@ export const executeAgentInstallationContract = defineRouteContract({
     schema: executeAgentInstallationResponseSchema,
   },
 })
+
+export const revokeAgentInstallationResponseSchema = z.object({
+  installationId: nonEmptyIdSchema,
+  releaseId: nonEmptyIdSchema,
+  workflowId: nonEmptyIdSchema,
+  version: z.number().int().positive(),
+  revokedAt: z.string().datetime(),
+  /** Always true: revoke never deletes or mutates AgentRelease. */
+  releaseIntact: z.literal(true),
+})
+
+export type RevokeAgentInstallationResponse = z.output<typeof revokeAgentInstallationResponseSchema>
+
+/**
+ * Session DELETE: soft-revoke caller's Installation (revokedAt).
+ * AgentRelease and other users' installations are untouched.
+ */
+export const revokeAgentInstallationContract = defineRouteContract({
+  method: 'DELETE',
+  path: '/api/agent-installations/[id]',
+  params: agentInstallationIdParamsSchema,
+  response: {
+    mode: 'json',
+    schema: revokeAgentInstallationResponseSchema,
+  },
+})

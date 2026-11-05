@@ -11,12 +11,13 @@ import {
   useAgentReleaseByToken,
   useDeferAgentInstallationUpdate,
   useInstallAgentRelease,
+  useRevokeAgentInstallation,
 } from '@/hooks/queries/agent-installations'
 import { useWorkspacesQuery } from '@/hooks/queries/workspace'
 
 /**
  * Install-by-link page for Publish share URLs (`/install/{token}`).
- * No catalog / fork UX — only «Поставить себе» and pending Accept/Defer.
+ * No catalog / fork UX — only «Поставить себе», Accept/Defer, and revoke.
  */
 export function InstallByToken() {
   const params = useParams<{ token: string }>()
@@ -30,6 +31,7 @@ export function InstallByToken() {
   const installMutation = useInstallAgentRelease()
   const acceptMutation = useAcceptAgentInstallationUpdate()
   const deferMutation = useDeferAgentInstallationUpdate()
+  const revokeMutation = useRevokeAgentInstallation()
 
   const meta = releaseQuery.data ?? null
   const [workspaceId, setWorkspaceId] = useState('')
@@ -54,7 +56,10 @@ export function InstallByToken() {
     meta?.installation?.updatePolicy === 'pending' ||
     meta?.installation?.updatePolicy === 'deferred'
   const busy =
-    installMutation.isPending || acceptMutation.isPending || deferMutation.isPending
+    installMutation.isPending ||
+    acceptMutation.isPending ||
+    deferMutation.isPending ||
+    revokeMutation.isPending
 
   const errorMessage =
     formError ??
@@ -77,6 +82,11 @@ export function InstallByToken() {
       ? deferMutation.error.message
       : deferMutation.error
         ? 'Не удалось отложить обновление'
+        : null) ??
+    (revokeMutation.error instanceof ApiClientError
+      ? revokeMutation.error.message
+      : revokeMutation.error
+        ? 'Не удалось отозвать установку'
         : null)
 
   const onInstall = async () => {
@@ -113,6 +123,18 @@ export function InstallByToken() {
     setFormError(null)
     try {
       await deferMutation.mutateAsync(meta.installation.id)
+    } catch {
+      // surfaced via mutation error
+    }
+  }
+
+  const onRevoke = async () => {
+    const installationId = meta?.installation?.id ?? doneId
+    if (!installationId) return
+    setFormError(null)
+    try {
+      await revokeMutation.mutateAsync(installationId)
+      setDoneId(null)
     } catch {
       // surfaced via mutation error
     }
@@ -225,7 +247,7 @@ export function InstallByToken() {
                 <p style={{ marginBottom: 16, opacity: 0.7 }}>Credentials не требуются.</p>
               )}
 
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button type='button' disabled={busy || !workspaceId} onClick={() => void onInstall()}>
                   {installMutation.isPending
                     ? 'Устанавливаем…'
@@ -233,6 +255,11 @@ export function InstallByToken() {
                       ? 'Обновить установку'
                       : 'Поставить себе'}
                 </button>
+                {doneId || meta.installation ? (
+                  <button type='button' disabled={busy} onClick={() => void onRevoke()}>
+                    {revokeMutation.isPending ? 'Отзываем…' : 'Отозвать установку'}
+                  </button>
+                ) : null}
                 {doneId ? (
                   <button type='button' onClick={() => router.push(APP_ENTRY_PATH)}>
                     На главную
@@ -240,6 +267,14 @@ export function InstallByToken() {
                 ) : null}
               </div>
             </>
+          ) : null}
+
+          {updatePending && meta.installation ? (
+            <div style={{ marginTop: 16 }}>
+              <button type='button' disabled={busy} onClick={() => void onRevoke()}>
+                {revokeMutation.isPending ? 'Отзываем…' : 'Отозвать установку'}
+              </button>
+            </div>
           ) : null}
 
           {doneId && !updatePending ? (

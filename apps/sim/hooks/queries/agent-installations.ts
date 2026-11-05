@@ -11,6 +11,7 @@ import {
   type ListPendingAgentInstallationUpdatesResponse,
   resolveAgentReleaseByTokenContract,
   type ResolveAgentReleaseByTokenResponse,
+  revokeAgentInstallationContract,
 } from '@/lib/api/contracts/agent-installations'
 import {
   AGENT_INSTALLATION_UPDATES_STALE_TIME,
@@ -95,6 +96,19 @@ export function useDeferAgentInstallationUpdate() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: agentInstallationKeys.updates() })
+      await queryClient.invalidateQueries({ queryKey: agentInstallationKeys.all })
+    },
+  })
+}
+
+export function useRevokeAgentInstallation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (installationId: string) =>
+      requestJson(revokeAgentInstallationContract, {
+        params: { id: installationId },
+      }),
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: agentInstallationKeys.all })
     },
   })
