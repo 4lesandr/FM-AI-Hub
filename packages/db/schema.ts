@@ -5460,6 +5460,75 @@ export const workflowDeploymentOperation = pgTable(
   })
 )
 
+/**
+ * Immutable App Store edition of a workflow: sanitized snapshot + share link token.
+ * Not a deploy activation — Install pins a release, independent of the author's active deploy.
+ */
+export const agentRelease = pgTable(
+  'agent_release',
+  {
+    id: text('id').primaryKey(),
+    workflowId: text('workflow_id')
+      .notNull()
+      .references(() => workflow.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    /** Sanitized workflow state (no author secrets). */
+    state: json('state').notNull(),
+    shareToken: text('share_token').notNull(),
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    workflowVersionUnique: uniqueIndex('agent_release_workflow_version_unique').on(
+      table.workflowId,
+      table.version
+    ),
+    shareTokenUnique: uniqueIndex('agent_release_share_token_unique').on(table.shareToken),
+    workflowIdIdx: index('agent_release_workflow_id_idx').on(table.workflowId),
+    createdByIdx: index('agent_release_created_by_idx').on(table.createdBy),
+  })
+)
+
+export const agentInstallationUpdatePolicyEnum = pgEnum('agent_installation_update_policy', [
+  'pending',
+  'accepted',
+  'deferred',
+  'current',
+])
+
+export type AgentInstallationUpdatePolicy =
+  (typeof agentInstallationUpdatePolicyEnum.enumValues)[number]
+
+/**
+ * Per-user installation of an AgentRelease. Identity/credentials at run = installer (userId).
+ * updatePolicy tracks the App Store accept/defer channel; revokedAt soft-revokes this instance only.
+ */
+export const agentInstallation = pgTable(
+  'agent_installation',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** Pinned release; Accept repins to a newer AgentRelease. */
+    releaseId: text('release_id')
+      .notNull()
+      .references(() => agentRelease.id, { onDelete: 'restrict' }),
+    updatePolicy: agentInstallationUpdatePolicyEnum('update_policy').notNull().default('current'),
+    revokedAt: timestamp('revoked_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userReleaseActiveUnique: uniqueIndex('agent_installation_user_release_active_unique')
+      .on(table.userId, table.releaseId)
+      .where(sql`${table.revokedAt} IS NULL`),
+    userIdIdx: index('agent_installation_user_id_idx').on(table.userId),
+    releaseIdIdx: index('agent_installation_release_id_idx').on(table.releaseId),
+    updatePolicyIdx: index('agent_installation_update_policy_idx').on(table.updatePolicy),
+  })
+)
+
 /** Idempotency keys for preventing duplicate processing across all webhooks and triggers */
 export const idempotencyKey = pgTable(
   'idempotency_key',
