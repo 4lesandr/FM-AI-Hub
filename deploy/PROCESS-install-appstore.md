@@ -30,6 +30,8 @@
 - Fork ≠ App Store (нет обновлений).
 - Deployed chat ≠ Install (нет своего экземпляра / часто owner identity).
 
+Детальная карта API-хуков: [`docs/deploy/as-is-sim-api-hooks.md`](../docs/deploy/as-is-sim-api-hooks.md).
+
 ## Первый срез реализации (порядок)
 
 1. Модель данных Release + Installation (+ token link)
@@ -37,6 +39,8 @@
 3. UI: одна страница link → Install; бейдж обновлений
 4. Runtime: bind credentials установившего
 5. Не блокировать runtime k8s: можно разрабатывать на стенде после ns hub
+
+Чеклист задач MVP: [`docs/deploy/mvp-install-slice.md`](../docs/deploy/mvp-install-slice.md).
 
 ## Вне скоупа среза
 
