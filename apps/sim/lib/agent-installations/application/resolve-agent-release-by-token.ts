@@ -1,7 +1,7 @@
 import type { SessionPrincipal } from '@sim/auth/principal'
 import { agentInstallation, agentRelease, db, workflow } from '@sim/db'
 import { createLogger } from '@sim/logger'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import {
   collectAgentCredentialSlots,
   type AgentCredentialSlot,
@@ -30,6 +30,8 @@ export interface ResolveAgentReleaseByTokenResult {
     id: string
     updatePolicy: 'pending' | 'accepted' | 'deferred' | 'current'
     workspaceId: string | null
+    pinnedReleaseId: string
+    pinnedVersion: number
     createdAt: string
     updatedAt: string
   } | null
@@ -77,6 +79,7 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
       throw new OrchestrationError('not_found', 'Agent release not found for this share token')
     }
 
+    // Any active Installation for this user+workflow (pin may lag the share-token release after Publish N+1).
     const [existing] = await db
       .select({
         id: agentInstallation.id,
@@ -84,15 +87,19 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
         workspaceId: agentInstallation.workspaceId,
         createdAt: agentInstallation.createdAt,
         updatedAt: agentInstallation.updatedAt,
+        pinnedReleaseId: agentRelease.id,
+        pinnedVersion: agentRelease.version,
       })
       .from(agentInstallation)
+      .innerJoin(agentRelease, eq(agentRelease.id, agentInstallation.releaseId))
       .where(
         and(
           eq(agentInstallation.userId, principal.userId),
-          eq(agentInstallation.releaseId, row.releaseId),
+          eq(agentRelease.workflowId, row.workflowId),
           isNull(agentInstallation.revokedAt)
         )
       )
+      .orderBy(desc(agentInstallation.updatedAt))
       .limit(1)
 
     const credentialSlots = collectAgentCredentialSlots(row.state as Partial<WorkflowState>)
@@ -103,6 +110,7 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
       version: row.version,
       credentialSlotCount: credentialSlots.length,
       alreadyInstalled: Boolean(existing),
+      updatePolicy: existing?.updatePolicy ?? null,
     })
 
     return {
@@ -119,6 +127,8 @@ export const resolveAgentReleaseByToken = defineAuthorizedCredentialUserUseCase(
             id: existing.id,
             updatePolicy: existing.updatePolicy,
             workspaceId: existing.workspaceId,
+            pinnedReleaseId: existing.pinnedReleaseId,
+            pinnedVersion: existing.pinnedVersion,
             createdAt: existing.createdAt.toISOString(),
             updatedAt: existing.updatedAt.toISOString(),
           }

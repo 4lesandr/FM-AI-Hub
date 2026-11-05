@@ -15,6 +15,9 @@ export const agentInstallationSummarySchema = z.object({
   id: nonEmptyIdSchema,
   updatePolicy: z.enum(['pending', 'accepted', 'deferred', 'current']),
   workspaceId: nonEmptyIdSchema.nullable(),
+  /** Release the Installation is currently pinned to (may lag the share-token release). */
+  pinnedReleaseId: nonEmptyIdSchema,
+  pinnedVersion: z.number().int().positive(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })

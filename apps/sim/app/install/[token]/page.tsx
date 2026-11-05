@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { InstallByToken } from '@/app/install/[token]/install-by-token'
 
 export const metadata: Metadata = {
-  title: 'Install agent',
+  title: 'Поставить себе',
   robots: { index: false },
 }
 
