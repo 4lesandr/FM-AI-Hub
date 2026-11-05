@@ -70,22 +70,53 @@ REDIS_URL=redis://127.0.0.1:6380
 Миграции (только если схема пустая) — через compose `migrations` или точечный `bun run db:migrate` в `packages/db`.  
 App + realtime — снова на хосте (`bun run start`), **не** поднимать сервис `simstudio` из compose (он тянет image build).
 
-## FVKS token-exchange (/2c) — optional
+## FVKS token-exchange (/2c2) — live smoke
 
-Не требуется для подъёма стенда. Для ручного connect после SSO:
+Не требуется для подъёма стенда. Значения секретов **не** коммитить и **не** печатать.
 
+### Откуда взять env (контур FMAH Flomni)
+
+| Имя в Sim `.env.local` | Источник (без печати значений) |
+| --- | --- |
+| `HUB_OIDC_ISSUER` | `kubectl -n hub get deploy hub-api` env **или** `deploy/tenants/flomni.yaml` → `oidc.issuer` (`https://auth.flomni.com/realms/fteam`) |
+| `HUB_OIDC_CLIENT_ID` | то же → `hub` |
+| `HUB_OIDC_CLIENT_SECRET` | `kubectl -n hub get secret hub-secrets` ключ `HUB_OIDC_CLIENT_SECRET` |
+| `HUB_OIDC_PROVIDER_ID` | `keycloak` (или `SSO_PROVIDER_ID`, если SSO в Sim заведён под другим id) |
+| `HUB_IDP_AUDIENCES` | hub-api env / `oidc.idpAudiences` → `fvks=meet` |
+| `FVKS_MCP_URL` | hub-api env / `apps.fvks` → `https://meet.fm.flomni.ru/mcp` |
+| `FVKS_MCP_CLIENT_ID` / `FVKS_MCP_CLIENT_SECRET` | FMAH connector `fvks` (`oauth_client_*`, decrypt `HUB_KEK`) — то же, что terraform `fvks_pairs.mcp_client_*` / helm `agentHub.mcpClientId` |
+| `FVKS_MCP_TOKEN_URL` | обычно не нужен (discovery от MCP URL) |
+
+Одной командой (upsert в `apps/sim/.env.local`, значения не пишет в stdout):
+
+```bash
+bash deploy/bin/localdev-fvks-env-from-contour.sh
+bash deploy/bin/localdev-down.sh && bash deploy/bin/localdev-up.sh
 ```
-HUB_OIDC_ISSUER=…
-HUB_OIDC_CLIENT_ID=…
-HUB_OIDC_CLIENT_SECRET=…
-HUB_IDP_AUDIENCES=fvks=meet
-FVKS_MCP_URL=…
-FVKS_MCP_CLIENT_ID=…
-FVKS_MCP_CLIENT_SECRET=…
+
+Альтернатива: GitHub Actions vars/secrets репо FMAH (`HUB_OIDC_*`, `HUB_IDP_AUDIENCES`) + пара MCP из state/`pair-fvks` — тоже без эха в чат/git.
+
+### SSO access token → `account` (для POST без `subject_token`)
+
+`connectFvksForUser` читает `account.accessToken` где `providerId` = `HUB_OIDC_PROVIDER_ID` (default `keycloak`).
+
+1. В `.env.local` включить SSO на тот же realm: `SSO_ENABLED=true`, `SSO_PROVIDER_ID=keycloak`, `SSO_PROVIDER_TYPE=oidc`, `SSO_ISSUER` (= `HUB_OIDC_ISSUER`), `SSO_OIDC_CLIENT_ID` / `SSO_OIDC_CLIENT_SECRET`.
+2. **Отдельный** Keycloak client (или доп. redirect) на `http://localhost:3000/.../callback` — прод-клиент `hub` не ломать.
+3. Войти в UI → better-auth кладёт access token в `account`.
+4. `POST /api/fvks/connect` с cookie сессии, тело `{}`.
+
+Localdev без правки Keycloak redirects: передать `subject_token` (Keycloak access того же пользователя) в теле — паритет FMAH Agents connect. Токен взять из DevTools после входа в FMAH hub / Keycloak; в git/чат не класть.
+
+### Smoke
+
+```bash
+# нужен свежий Keycloak access (в FMAH account на контуре сейчас все expired)
+SUBJECT_TOKEN='…' bash deploy/bin/localdev-fvks-smoke.sh
 ```
 
-Затем (сессия браузера): `POST /api/fvks/connect` → в ответе `grant_id`.  
-Дизайн: `docs/deploy/token-exchange-fvks-mcp.md`. Compose/start scripts не менять.
+Ожидание: ненулевой `grant_id` (скрипт печатает только prefix/длину).  
+Если `.next` ещё без `/api/fvks/connect` (артефакт до `658e438`) — скрипт сам уходит в `bun` → `lib/fvks` (тот же exchange). HTTP-путь после лёгкого rebuild на Modal.  
+Дизайн: `docs/deploy/token-exchange-fvks-mcp.md`.
 
 ## FVKS events push (/2d) — optional
 

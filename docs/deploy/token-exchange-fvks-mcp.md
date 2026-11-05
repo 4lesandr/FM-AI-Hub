@@ -88,12 +88,12 @@ Realm: право клиента хаба на exchange к `meet` уже ест�
 
 ---
 
-## 6. Что осталось до рабочего exchange end-to-end
+## 6. Live localdev (/2c2)
 
-1. Заполнить secrets (`HUB_OIDC_*`, `FVKS_MCP_*`, `HUB_IDP_AUDIENCES`) в `.env.local` / `hub-secrets`.
-2. SSO Keycloak в Sim так, чтобы в `account` лежал access token (`HUB_OIDC_PROVIDER_ID`).
-3. Один live `POST /api/fvks/connect` → ненулевой `grant_id`.
-4. Вставить `grant_id` в FVKS trigger deploy; smoke webhook + MCP tool call под stored Bearer.
-5. (Опц.) hook after SSO sign-in → `connectAll` без ручного POST; Agents API `/api/app/v1`.
+1. Secrets в `.env.local`: `bash deploy/bin/localdev-fvks-env-from-contour.sh` (источники — таблица в `deploy/LOCALDEV.md`; значения не в git).
+2. Subject token: SSO sign-in → `account.accessToken` (`HUB_OIDC_PROVIDER_ID`), **или** body `subject_token` (DevTools после входа в FMAH).
+3. Smoke: `SUBJECT_TOKEN=… bash deploy/bin/localdev-fvks-smoke.sh` → ненулевой `grant_id`.
+4. Дальше: `grant_id` в FVKS trigger deploy; webhook + MCP tool под stored Bearer (`/2d`).
+5. (Опц.) hook after SSO → auto-connect; Agents API `/api/app/v1` (`/2e`).
 
-Localdev `/2b`: только новые optional env; compose/start scripts не менять.
+Localdev `/2b`: только optional env; compose/start scripts не менять.
