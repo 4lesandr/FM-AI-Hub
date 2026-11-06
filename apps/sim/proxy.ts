@@ -294,8 +294,9 @@ function handleInvitationRedirects(
 }
 
 /**
- * App Store Install-by-link + Installation chat: unauthenticated visitors go to
- * login with callback back to `/install/{token}` or `/installations/{id}/chat`.
+ * App Store Install-by-link + Installation / agent-home chat: unauthenticated
+ * visitors go to login with callback back to `/install/{token}`,
+ * `/installations/{id}/chat`, or `/apps…`.
  */
 function handleInstallRedirects(
   request: NextRequest,
@@ -304,7 +305,8 @@ function handleInstallRedirects(
   const { pathname, search } = request.nextUrl
   const isInstallLink = pathname.startsWith('/install/')
   const isInstallationChat = pathname.startsWith('/installations/')
-  if (!isInstallLink && !isInstallationChat) {
+  const isAgentApps = pathname === '/apps' || pathname.startsWith('/apps/')
+  if (!isInstallLink && !isInstallationChat && !isAgentApps) {
     return null
   }
 
@@ -542,6 +544,8 @@ export const config = {
     '/invite/:path*', // Match invitation routes
     '/install/:path*', // App Store Install-by-link
     '/installations/:path*', // Installation chat (installer identity)
+    '/apps', // Agent-home list (U2)
+    '/apps/:path*', // Agent-home Installation pane
     // Runtime CORS. The desktop's raw upload routes and the realtime relay's document persists are
     // left out: running the proxy makes Next buffer the body, cutting it off at its 10 MB proxy
     // limit, and those bodies are whole files or document snapshots.

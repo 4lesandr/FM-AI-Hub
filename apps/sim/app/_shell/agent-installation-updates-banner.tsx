@@ -3,7 +3,7 @@
 import { Badge, Banner, Button } from '@sim/emcn'
 import { useRouter } from 'next/navigation'
 import { useSession } from '@/lib/auth/client'
-import { installationChatPath } from '@/lib/navigation/installation-paths'
+import { appsInstallationPath } from '@/lib/navigation/installation-paths'
 import {
   useAcceptAgentInstallationUpdate,
   useDeferAgentInstallationUpdate,
@@ -12,7 +12,7 @@ import {
 
 /**
  * Session badge for pending agent Installation updates (Publish N+1 channel).
- * Uses emcn Banner/Badge/Button — same kit as the rest of Sim chrome.
+ * Workspace chrome; agent-home also surfaces Accept/Defer in /apps rail + pane (U4).
  */
 export function AgentInstallationUpdatesBanner() {
   const router = useRouter()
@@ -70,7 +70,7 @@ export function AgentInstallationUpdatesBanner() {
                 variant='ghost'
                 onClick={() =>
                   router.push(
-                    installationChatPath(update.installationId, { title: update.workflowName })
+                    appsInstallationPath(update.installationId, { title: update.workflowName })
                   )
                 }
               >

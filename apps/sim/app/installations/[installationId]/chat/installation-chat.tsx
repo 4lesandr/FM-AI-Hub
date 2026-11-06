@@ -1,11 +1,10 @@
 'use client'
 
-import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, usePrefersReducedMotion } from '@sim/emcn'
 import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
 import { InstallationUpdateControls } from '@/app/apps/components/installation-update-controls'
-import { DesktopTitleBarLane } from '@/app/_shell/desktop-title-bar'
 import {
   ChatErrorState,
   ChatHeader,
@@ -16,7 +15,6 @@ import {
 } from '@/app/(interfaces)/chat/components'
 import { CHAT_ERROR_MESSAGES, CHAT_REQUEST_TIMEOUT_MS } from '@/app/(interfaces)/chat/constants'
 import { useChatStreaming } from '@/app/(interfaces)/chat/hooks'
-import { InterfacesShell } from '@/app/(interfaces)/components'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
 import { useSession } from '@/lib/auth/client'
 import {
@@ -30,7 +28,6 @@ import {
 } from '@/hooks/queries/agent-installations'
 import { agentInstallationKeys } from '@/hooks/queries/utils/agent-installation-keys'
 import { useGitHubStars } from '@/hooks/queries/github-stars'
-import { useMobileViewport } from '@/hooks/use-mobile-viewport'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -38,20 +35,7 @@ const logger = createLogger('InstallationChat')
 
 const NEAR_BOTTOM_THRESHOLD_PX = 100
 
-function ChatViewport({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useMobileViewport({ ref })
-  return (
-    <div
-      ref={ref}
-      className='light desktop-title-bar-page fixed inset-0 z-[var(--z-dropdown)] flex flex-col bg-[var(--bg)] text-[var(--text-primary)] max-md:top-[var(--mobile-viewport-top,0px)] max-md:bottom-auto max-md:h-[var(--mobile-viewport-height,100dvh)] max-md:min-h-0!'
-    >
-      {children}
-    </div>
-  )
-}
-
-/** Fills the agent-home content pane under WorkspaceChrome (U2). */
+/** Fills the agent-home content pane under WorkspaceChrome (`/apps/{id}`). */
 function ChatPane({ children }: { children: React.ReactNode }) {
   return (
     <div className='light flex h-full min-h-0 flex-col bg-[var(--bg)] text-[var(--text-primary)]'>
@@ -62,19 +46,15 @@ function ChatPane({ children }: { children: React.ReactNode }) {
 
 interface InstallationChatProps {
   installationId: string
-  /**
-   * When true, render inside agent-home `/apps` chrome (rail stays visible).
-   * When false, legacy LogoShell fullscreen (`/installations/.../chat`).
-   */
-  embedded?: boolean
 }
 
 /**
- * Installation chat engine (C3): same (interfaces)/chat kit, streamed turns +
- * server InstallationThread history. Mount-agnostic for `/apps/{id}` pane.
- * Identity stays installer via POST …/chat → run_installation tool.
+ * Installation chat engine in the agent-home pane (`/apps/{id}`).
+ * Stream client + server InstallationThread history. C1 agent loop plugs into
+ * the same POST …/chat SSE; this UI already consumes tool + chunk frames.
+ * Identity stays installer via chat route → tools (run_installation).
  */
-export function InstallationChat({ installationId, embedded = false }: InstallationChatProps) {
+export function InstallationChat({ installationId }: InstallationChatProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const titleParam = searchParams.get('title')?.trim()
@@ -90,7 +70,7 @@ export function InstallationChat({ installationId, embedded = false }: Installat
     enabled: Boolean(session?.user),
   })
   const { data: pendingUpdates } = usePendingAgentInstallationUpdates({
-    enabled: embedded && Boolean(session?.user),
+    enabled: Boolean(session?.user),
   })
   const pendingUpdate = useMemo(
     () => pendingUpdates?.updates.find((update) => update.installationId === installationId),
@@ -286,18 +266,19 @@ export function InstallationChat({ installationId, embedded = false }: Installat
     }
   }
 
-  const wrapGate = (node: ReactNode) =>
-    embedded ? <ChatPane>{node}</ChatPane> : <InterfacesShell>{node}</InterfacesShell>
-
   if (sessionPending) {
-    return wrapGate(<ChatLoadingState />)
+    return (
+      <ChatPane>
+        <ChatLoadingState />
+      </ChatPane>
+    )
   }
 
   if (!session?.user) {
-    // U3: login returns to agent home `/apps/{id}` (legacy `/installations/.../chat` redirects).
+    // Login returns to agent home `/apps/{id}` (legacy `/installations/.../chat` redirects).
     const callbackUrl = appsInstallationPath(installationId, { title: titleParam })
-    return wrapGate(
-      <>
+    return (
+      <ChatPane>
         <ChatErrorState error='Войдите, чтобы открыть чат Installation.' />
         <div className='flex justify-center pb-10'>
           <Button
@@ -307,28 +288,39 @@ export function InstallationChat({ installationId, embedded = false }: Installat
             Войти
           </Button>
         </div>
-      </>
+      </ChatPane>
     )
   }
 
   if (chatHistoryPending && !historyHydrated) {
-    return wrapGate(<ChatLoadingState />)
+    return (
+      <ChatPane>
+        <ChatLoadingState />
+      </ChatPane>
+    )
   }
 
   if (chatHistoryError && !historyHydrated) {
     logger.error('Failed to load Installation chat history', { error: chatHistoryError })
-    return wrapGate(<ChatErrorState error={CHAT_ERROR_MESSAGES.CHAT_UNAVAILABLE} />)
+    return (
+      <ChatPane>
+        <ChatErrorState error={CHAT_ERROR_MESSAGES.CHAT_UNAVAILABLE} />
+      </ChatPane>
+    )
   }
 
   if (fatalError) {
-    return wrapGate(<ChatErrorState error={fatalError} />)
+    return (
+      <ChatPane>
+        <ChatErrorState error={fatalError} />
+      </ChatPane>
+    )
   }
 
-  const chatBody = (
-    <>
-      {!embedded && <DesktopTitleBarLane />}
+  return (
+    <ChatPane>
       <ChatHeader chatConfig={chatConfig} starCount={starCount ?? ''} />
-      {embedded && pendingUpdate ? (
+      {pendingUpdate ? (
         <InstallationUpdateControls
           installationId={pendingUpdate.installationId}
           pinnedVersion={pendingUpdate.pinnedVersion}
@@ -357,8 +349,6 @@ export function InstallationChat({ installationId, embedded = false }: Installat
           />
         </div>
       </div>
-    </>
+    </ChatPane>
   )
-
-  return embedded ? <ChatPane>{chatBody}</ChatPane> : <ChatViewport>{chatBody}</ChatViewport>
 }
