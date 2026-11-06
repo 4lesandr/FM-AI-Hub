@@ -5,6 +5,7 @@
  * Used by both regular routes and admin routes to ensure consistent business logic.
  */
 
+import { AuditAction, AuditResourceType, recordAudit } from '@sim/audit'
 import { db } from '@sim/db'
 import {
   account,
@@ -64,6 +65,10 @@ import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
 import { type StoppedRun, stopLiveRunsTx } from '@/lib/mothership/async-runs/repository'
 import { enqueueMemoryCleanup } from '@/lib/mothership/memories/cleanup-outbox'
 import { requireMemberManagementAuthority } from '@/lib/organizations/members/authority'
+import {
+  countRemainingOrgMemberships,
+  resolveRevokePersonalApiKeysOnLeave,
+} from '@/lib/organizations/members/key-policy'
 import {
   revokePersonalApiKeysTx,
   revokeUserSessionsTx,
@@ -508,10 +513,12 @@ export interface RemoveMemberParams {
   /** Skip departed usage capture and Pro restoration (default: false) */
   skipBillingLogic?: boolean
   /**
-   * Also delete the member's personal API keys. Off by default: personal keys
-   * are the person's own and outlive one organization. Directory
-   * deprovisioning turns it on, because there the person is leaving Sim as far
-   * as the organization is concerned.
+   * Also delete the member's personal API keys and OAuth grants.
+   *
+   * Directory deprovisioning passes `true` to force revoke. When omitted/false,
+   * leave still revokes if `ORG_REVOKE_PERSONAL_KEYS_ON_LEAVE` is on and the
+   * user has zero remaining org memberships after this removal (hub policy).
+   * Workspace API keys are never deleted here.
    */
   revokePersonalApiKeys?: boolean
   /** The caller's own session token, kept alive when a member removes themselves. */
@@ -543,6 +550,8 @@ export interface RemoveMemberResult {
    * access, so the membership was intentionally left in place.
    */
   removed?: boolean
+  /** Personal API keys deleted during this removal (0 when leave policy kept them). */
+  personalKeysRevoked?: number
   billingActions: {
     usageCaptured: number
     proRestored: boolean
@@ -1470,8 +1479,18 @@ export async function removeUserFromOrganization(
          * row that described this membership is replaced by its tombstone in the
          * same commit, so the directory and the organization can never disagree
          * about who is a member.
+         *
+         * Personal keys: SCIM forces revoke; otherwise hub leave policy burns
+         * them only when this was the user's last org membership.
          */
-        if (revokePersonalApiKeys) await revokePersonalApiKeysTx(tx, { userId })
+        const remainingOrgMemberships = await countRemainingOrgMemberships(tx, userId)
+        const doRevokePersonalApiKeys = resolveRevokePersonalApiKeysOnLeave({
+          forceRevoke: revokePersonalApiKeys,
+          remainingOrgMemberships,
+        })
+        const personalKeysRevoked = doRevokePersonalApiKeys
+          ? (await revokePersonalApiKeysTx(tx, { userId })).revoked
+          : 0
         await endDirectoryMembershipTx(tx, { userId, organizationId })
         /** The member's organization Assistant runs and their runs in its workspaces end with access. */
         const stoppedRuns = [
@@ -1504,7 +1523,7 @@ export async function removeUserFromOrganization(
           ...(spareSessionToken ? { spareSessionToken } : {}),
           ...(spareSessionId ? { spareSessionId } : {}),
         })
-        if (revokePersonalApiKeys) await revokeUserOAuthGrants(userId, tx)
+        if (doRevokePersonalApiKeys) await revokeUserOAuthGrants(userId, tx)
 
         if (workspaceIds.length === 0) {
           return {
@@ -1515,6 +1534,7 @@ export async function removeUserFromOrganization(
             usageCaptured: 0,
             credentialMembershipsRevoked: 0,
             pendingInvitationsCancelled: cancelledInvitations.length,
+            personalKeysRevoked,
             stoppedRuns,
           }
         }
@@ -1543,6 +1563,7 @@ export async function removeUserFromOrganization(
           usageCaptured: 0,
           credentialMembershipsRevoked,
           pendingInvitationsCancelled: cancelledInvitations.length,
+          personalKeysRevoked,
           stoppedRuns,
         }
       }
@@ -1554,17 +1575,41 @@ export async function removeUserFromOrganization(
         userId,
         memberId,
       })
-      return { success: true, removed: false, billingActions, stoppedRuns: [] }
+      return {
+        success: true,
+        removed: false,
+        personalKeysRevoked: 0,
+        billingActions,
+        stoppedRuns: [],
+      }
     }
 
     billingActions.usageCaptured = result.usageCaptured
     billingActions.workspaceAccessRevoked = result.workspaceIdsToRevoke.length
     billingActions.pendingInvitationsCancelled = result.pendingInvitationsCancelled
+    const personalKeysRevoked = result.personalKeysRevoked
 
     // The departed member's cookie-version/hook-clamp fallbacks must stop
     // resolving to this org immediately, not after the membership-cache TTL.
     invalidateMembershipCache(userId)
     invalidateSecurityPolicyVersionCache(organizationId)
+
+    if (personalKeysRevoked > 0) {
+      recordAudit({
+        workspaceId: null,
+        actorId: actorUserId ?? userId,
+        action: AuditAction.PERSONAL_API_KEY_REVOKED,
+        resourceType: AuditResourceType.API_KEY,
+        resourceId: userId,
+        description: `Revoked ${personalKeysRevoked} personal API key(s) on organization leave`,
+        metadata: {
+          reason: 'org_leave',
+          organizationId,
+          count: personalKeysRevoked,
+          targetUserId: userId,
+        },
+      })
+    }
 
     logger.info('Removed member from organization', {
       organizationId,
@@ -1573,6 +1618,7 @@ export async function removeUserFromOrganization(
       workspaceAccessRevoked: result.workspaceIdsToRevoke.length,
       credentialMembershipsRevoked: result.credentialMembershipsRevoked,
       pendingInvitationsCancelled: result.pendingInvitationsCancelled,
+      personalKeysRevoked,
     })
 
     if (!skipBillingLogic) {
@@ -1617,10 +1663,22 @@ export async function removeUserFromOrganization(
       }
     }
 
-    return { success: true, removed: true, billingActions, stoppedRuns: result.stoppedRuns }
+    return {
+      success: true,
+      removed: true,
+      personalKeysRevoked,
+      billingActions,
+      stoppedRuns: result.stoppedRuns,
+    }
   } catch (error) {
     if (error instanceof WorkspaceBillingAccountRemovalError) {
-      return { success: false, error: error.message, billingActions, stoppedRuns: [] }
+      return {
+        success: false,
+        error: error.message,
+        personalKeysRevoked: 0,
+        billingActions,
+        stoppedRuns: [],
+      }
     }
     if (onError === 'throw') throw error
     if (error instanceof ForbiddenOperationError) {
@@ -1628,6 +1686,7 @@ export async function removeUserFromOrganization(
         success: false,
         error: error.message,
         refusalCode: error.detailCode,
+        personalKeysRevoked: 0,
         billingActions,
         stoppedRuns: [],
       }
@@ -1642,6 +1701,7 @@ export async function removeUserFromOrganization(
     return {
       success: false,
       error: 'Failed to remove user from organization',
+      personalKeysRevoked: 0,
       billingActions,
       stoppedRuns: [],
     }

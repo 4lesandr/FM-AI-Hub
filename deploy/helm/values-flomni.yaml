@@ -22,6 +22,8 @@ app:
     ENTERPRISE_ENABLED: "true"
     NEXT_PUBLIC_ENTERPRISE_ENABLED: "true"
     EMAIL_PASSWORD_SIGNUP_ENABLED: "false"
+    # Leave = revoke personal API keys when the user has no remaining orgs
+    ORG_REVOKE_PERSONAL_KEYS_ON_LEAVE: "true"
     # SSO_* → true after Keycloak provider registered
     SSO_ENABLED: ""
     NEXT_PUBLIC_SSO_ENABLED: ""

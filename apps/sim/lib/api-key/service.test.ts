@@ -87,6 +87,54 @@ describe('authenticateApiKeyFromHeader', () => {
     expect(dbChainMockFns.where).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects a personal key when the user is suspended without deleting the key row', async () => {
+    const record = personalKeyRecord({ userSuspendedAt: new Date('2026-01-01T00:00:00Z') })
+    dbChainMockFns.where.mockResolvedValueOnce([record])
+
+    const result = await authenticateApiKeyFromHeader('sk-sim-plain-key', {
+      userId: 'user-1',
+    })
+
+    expect(result).toEqual({ success: false, error: 'Invalid API key' })
+    expect(dbChainMockFns.delete).not.toHaveBeenCalled()
+  })
+
+  it('still accepts a workspace key when the creator is suspended', async () => {
+    mockGetWorkspaceBillingSettings.mockResolvedValueOnce({
+      allowPersonalApiKeys: true,
+    })
+    const record = personalKeyRecord({
+      type: 'workspace',
+      workspaceId: 'ws-1',
+      userSuspendedAt: new Date('2026-01-01T00:00:00Z'),
+    })
+    dbChainMockFns.where.mockResolvedValueOnce([record])
+
+    const result = await authenticateApiKeyFromHeader('sk-sim-plain-key', {
+      workspaceId: 'ws-1',
+      keyTypes: ['workspace'],
+    })
+
+    expect(result).toEqual({
+      success: true,
+      userId: 'user-1',
+      keyId: 'key-1',
+      keyType: 'workspace',
+      workspaceId: 'ws-1',
+    })
+  })
+
+  it('returns invalid when the personal key row was deleted (leave revoke)', async () => {
+    dbChainMockFns.where.mockReset()
+    dbChainMockFns.where.mockResolvedValueOnce([])
+
+    const result = await authenticateApiKeyFromHeader('sk-sim-plain-key', {
+      userId: 'user-1',
+    })
+
+    expect(result).toEqual({ success: false, error: 'Invalid API key' })
+  })
+
   it('queries by the sha256 hash of the incoming header', async () => {
     dbChainMockFns.where.mockResolvedValueOnce([personalKeyRecord()])
 

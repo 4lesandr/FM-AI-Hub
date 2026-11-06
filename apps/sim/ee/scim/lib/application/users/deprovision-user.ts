@@ -26,6 +26,7 @@ export interface DeprovisionScimUserResult {
   userId: string
   /** False when the account had already left the organization by other means. */
   removedFromOrganization: boolean
+  personalKeysRevoked: number
 }
 
 /**
@@ -68,6 +69,7 @@ export const deprovisionScimUser = defineAuthorizedScimUseCase({
       )
     }
 
+    let personalKeysRevoked = 0
     if (membership) {
       const removal = await removeUserFromOrganization({
         userId: current.userId,
@@ -79,6 +81,7 @@ export const deprovisionScimUser = defineAuthorizedScimUseCase({
       if (!removal.success) {
         throw new ScimError(409, undefined, removal.error ?? 'The member could not be removed')
       }
+      personalKeysRevoked = removal.personalKeysRevoked ?? 0
     } else {
       /**
        * The account left through a path that predates this connection's row, or
@@ -97,6 +100,7 @@ export const deprovisionScimUser = defineAuthorizedScimUseCase({
       scimUserId: current.id,
       userId: current.userId,
       removedFromOrganization: Boolean(membership),
+      personalKeysRevoked,
     }
   },
 
@@ -114,7 +118,11 @@ export const deprovisionScimUser = defineAuthorizedScimUseCase({
             resourceType: AuditResourceType.ORGANIZATION,
             resourceId: context.organizationId,
             description: 'Removed from the organization through directory deprovisioning',
-            metadata: { targetUserId: result.userId, scimUserId: result.scimUserId },
+            metadata: {
+              targetUserId: result.userId,
+              scimUserId: result.scimUserId,
+              personalKeysRevoked: result.personalKeysRevoked,
+            },
           },
         ]
       : []),

@@ -74,6 +74,7 @@ export const removeOrganizationMember = defineAuthorizedOrganizationUseCase({
       targetUserId: input.userId,
       targetEmail: result.target.userEmail,
       targetName: result.target.userName,
+      personalKeysRevoked: result.removal.personalKeysRevoked ?? 0,
       ...(result.membershipType === 'external'
         ? { membershipType: 'external', ...result.removal }
         : { wasSelfRemoval: result.wasSelfRemoval, seatReduction: result.seatReduction }),

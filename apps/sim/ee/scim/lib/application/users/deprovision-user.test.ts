@@ -90,6 +90,7 @@ describe('deprovisionScimUser', () => {
       organizationId: 'org-1',
     })
     expect(result.removedFromOrganization).toBe(false)
+    expect(result.personalKeysRevoked).toBe(0)
     expect(mocks.reconcileSeats).not.toHaveBeenCalled()
     const actions = mocks.recordAudit.mock.calls[0][0].entries.map(
       (entry: { action: string }) => entry.action

@@ -299,7 +299,11 @@ export const DELETE = withRouteHandler(
         resourceType: AuditResourceType.ORGANIZATION,
         resourceId: organizationId,
         description: 'Admin API removed member from organization',
-        metadata: { memberId, targetUserId: userId },
+        metadata: {
+          memberId,
+          targetUserId: userId,
+          personalKeysRevoked: result.personalKeysRevoked ?? 0,
+        },
         request,
       })
 

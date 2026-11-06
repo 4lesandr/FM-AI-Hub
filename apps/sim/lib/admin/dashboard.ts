@@ -1609,7 +1609,11 @@ export async function removeDashboardOrganizationMember(
     resourceType: AuditResourceType.ORGANIZATION,
     resourceId: organizationId,
     description: 'Admin removed organization member',
-    metadata: { targetUserId: existing.userId, memberId },
+    metadata: {
+      targetUserId: existing.userId,
+      memberId,
+      personalKeysRevoked: result.personalKeysRevoked ?? 0,
+    },
   })
 }
 

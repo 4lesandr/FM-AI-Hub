@@ -21,6 +21,7 @@
 | 0.5 | Keycloak `fteam`: клиент/redirect под Sim callback; **старый FMAH client не ломать** | ☐ |
 | 0.6 | Localdev smoke зелёный (раздел 2) | ☐ |
 | 0.7 | Dry-run CI: Actions **Deploy hub** `dry_run=true` (скрипт откажется apply, пока жив release `hub`) | ☐ |
+| 0.8 | Hub env: `ORG_REVOKE_PERSONAL_KEYS_ON_LEAVE=true` в `values-flomni` / tenant / `.env.example` (leave burns personal keys) | ☐ |
 
 As-is FMAH (VK, ns `hub`): release `hub` · chart `hub-tenant` · ingress `hub.hidden-route.com`.  
 To-be: release `fm-ai-hub` · URL `https://hub.fm.flomni.ru`.

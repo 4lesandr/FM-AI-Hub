@@ -20,6 +20,7 @@ appEnv:
   SSO_ENABLED: "true"          # после регистрации SSO provider
   NEXT_PUBLIC_SSO_ENABLED: "true"
   EMAIL_PASSWORD_SIGNUP_ENABLED: "false"
+  ORG_REVOKE_PERSONAL_KEYS_ON_LEAVE: "true"
 
 # Keycloak fteam — клиент завести до выкладки (Brief / админ)
 oidc:

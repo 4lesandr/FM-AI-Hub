@@ -673,6 +673,13 @@ export const env = createEnv({
 
     // Organizations - for self-hosted deployments
     ORGANIZATIONS_ENABLED:                 z.boolean().optional(),                 // Enable organizations on self-hosted (bypasses plan requirements)
+    /**
+     * When true, leaving an organization deletes the user's personal API keys if
+     * they have no remaining org memberships (FLOMNI hub default). Unset/false
+     * keeps upstream SaaS leave behavior (keys survive). SCIM deprovision still
+     * forces revoke regardless of this flag.
+     */
+    ORG_REVOKE_PERSONAL_KEYS_ON_LEAVE:     z.boolean().optional(),
 
     // Instance-tier organization - every user auto-joins this one org
     INSTANCE_ORG_NAME:                     z.string().min(1).optional(),           // Display name of the instance organization; setting it turns instance-org mode on

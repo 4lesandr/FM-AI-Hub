@@ -198,6 +198,7 @@ export const POST = withRouteHandler(
           targetUserId: session.user.id,
           wasSelfRemoval: true,
           followedOwnershipTransfer: true,
+          personalKeysRevoked: removeResult.personalKeysRevoked ?? 0,
         },
         request,
       })

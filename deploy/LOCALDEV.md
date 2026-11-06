@@ -22,6 +22,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 BETTER_AUTH_URL=http://localhost:3000
 SOCKET_SERVER_URL=http://127.0.0.1:3002
 NEXT_PUBLIC_SOCKET_URL=http://127.0.0.1:3002
+ORG_REVOKE_PERSONAL_KEYS_ON_LEAVE=true
 ```
 
 ## Вариант A — хост (предпочтительно на Air)
