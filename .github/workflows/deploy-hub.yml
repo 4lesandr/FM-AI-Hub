@@ -1,0 +1,49 @@
+# Кнопка выкладки FM AI Hub — как FVKS deploy-vk: push сам ничего не катит.
+# Кластер тот же, что meet/fvcs. Локальный kubectl с Air не нужен.
+name: Deploy hub (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Зачем выкатываем"
+        required: true
+        type: string
+      dry_run:
+        description: "Только helm dry-run (без apply)"
+        type: boolean
+        default: true
+      image_tag:
+        description: "Опциональный тег образа app (пусто = values чарта)"
+        type: string
+        default: ""
+
+concurrency:
+  group: deploy-hub
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      # Тот же kubeconfig, что у FVKS кнопки (кластер meet). Завести в secrets репо.
+      HUB_KUBECONFIG: ${{ secrets.HUB_KUBECONFIG }}
+      VK_KUBECONFIG: ${{ secrets.VK_KUBECONFIG }}
+      HUB_POSTGRES_PASSWORD: ${{ secrets.HUB_POSTGRES_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.33.5
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Reason
+        run: |
+          echo "reason=${{ inputs.reason }}"
+          echo "dry_run=${{ inputs.dry_run }}"
+      - name: Deploy hub
+        run: bash deploy/bin/ci_deploy_hub.sh
