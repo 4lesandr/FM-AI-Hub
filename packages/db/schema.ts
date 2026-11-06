@@ -5558,6 +5558,60 @@ export const agentInstallation = pgTable(
   })
 )
 
+/**
+ * Dialog history for an Installation pane (/3g-chat).
+ * MVP: one active thread per Installation (unique on installation_id).
+ */
+export const agentInstallationThread = pgTable(
+  'agent_installation_thread',
+  {
+    id: text('id').primaryKey(),
+    installationId: text('installation_id')
+      .notNull()
+      .references(() => agentInstallation.id, { onDelete: 'cascade' }),
+    /** Installer who owns the Installation — denormalized for authorize-without-join. */
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    installationUnique: uniqueIndex('agent_installation_thread_installation_unique').on(
+      table.installationId
+    ),
+    userIdIdx: index('agent_installation_thread_user_id_idx').on(table.userId),
+  })
+)
+
+export const agentInstallationThreadMessageRoleEnum = pgEnum(
+  'agent_installation_thread_message_role',
+  ['user', 'assistant']
+)
+
+export type AgentInstallationThreadMessageRole =
+  (typeof agentInstallationThreadMessageRoleEnum.enumValues)[number]
+
+/** Turn messages for an InstallationThread. Content is display text only (no secrets). */
+export const agentInstallationThreadMessage = pgTable(
+  'agent_installation_thread_message',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('thread_id')
+      .notNull()
+      .references(() => agentInstallationThread.id, { onDelete: 'cascade' }),
+    role: agentInstallationThreadMessageRoleEnum('role').notNull(),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    threadCreatedAtIdx: index('agent_installation_thread_message_thread_created_at_idx').on(
+      table.threadId,
+      table.createdAt
+    ),
+  })
+)
+
 /** Idempotency keys for preventing duplicate processing across all webhooks and triggers */
 export const idempotencyKey = pgTable(
   'idempotency_key',

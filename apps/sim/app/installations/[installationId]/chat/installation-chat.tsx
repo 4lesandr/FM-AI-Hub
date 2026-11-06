@@ -1,11 +1,10 @@
 'use client'
 
-import { type RefObject, useCallback, useMemo, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, usePrefersReducedMotion } from '@sim/emcn'
 import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
-import { ApiClientError } from '@/lib/api/client/errors'
-import { useSession } from '@/lib/auth/client'
+import { InstallationUpdateControls } from '@/app/apps/components/installation-update-controls'
 import { DesktopTitleBarLane } from '@/app/_shell/desktop-title-bar'
 import {
   ChatErrorState,
@@ -16,25 +15,28 @@ import {
   ChatMessageContainer,
 } from '@/app/(interfaces)/chat/components'
 import { CHAT_ERROR_MESSAGES, CHAT_REQUEST_TIMEOUT_MS } from '@/app/(interfaces)/chat/constants'
+import { useChatStreaming } from '@/app/(interfaces)/chat/hooks'
 import { InterfacesShell } from '@/app/(interfaces)/components'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
-import { useExecuteAgentInstallation } from '@/hooks/queries/agent-installations'
+import { useSession } from '@/lib/auth/client'
+import {
+  AGENT_STREAM_PROTOCOL_HEADER,
+  AGENT_STREAM_PROTOCOL_V1,
+} from '@/lib/workflows/streaming/agent-stream-protocol'
+import { appsInstallationPath } from '@/lib/navigation/installation-paths'
+import {
+  useInstallationChat,
+  usePendingAgentInstallationUpdates,
+} from '@/hooks/queries/agent-installations'
+import { agentInstallationKeys } from '@/hooks/queries/utils/agent-installation-keys'
 import { useGitHubStars } from '@/hooks/queries/github-stars'
 import { useMobileViewport } from '@/hooks/use-mobile-viewport'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const logger = createLogger('InstallationChat')
 
 const NEAR_BOTTOM_THRESHOLD_PX = 100
-
-function formatInstallationOutput(output: unknown): string {
-  if (output === null || output === undefined) return ''
-  if (typeof output === 'string') return output
-  if (typeof output === 'object') {
-    return `\`\`\`json\n${JSON.stringify(output, null, 2)}\n\`\`\``
-  }
-  return String(output)
-}
 
 function ChatViewport({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -49,38 +51,69 @@ function ChatViewport({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Fills the agent-home content pane under WorkspaceChrome (U2). */
+function ChatPane({ children }: { children: React.ReactNode }) {
+  return (
+    <div className='light flex h-full min-h-0 flex-col bg-[var(--bg)] text-[var(--text-primary)]'>
+      {children}
+    </div>
+  )
+}
+
 interface InstallationChatProps {
   installationId: string
+  /**
+   * When true, render inside agent-home `/apps` chrome (rail stays visible).
+   * When false, legacy LogoShell fullscreen (`/installations/.../chat`).
+   */
+  embedded?: boolean
 }
 
 /**
- * Full-screen Installation chat — same (interfaces)/chat kit as deployed chat.
- * Messages run through POST /api/agent-installations/[id]/execute (installer identity).
- * Author workflow editor is not opened; graph is not editable here.
+ * Installation chat engine (C3): same (interfaces)/chat kit, streamed turns +
+ * server InstallationThread history. Mount-agnostic for `/apps/{id}` pane.
+ * Identity stays installer via POST …/chat → run_installation tool.
  */
-export function InstallationChat({ installationId }: InstallationChatProps) {
+export function InstallationChat({ installationId, embedded = false }: InstallationChatProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const titleParam = searchParams.get('title')?.trim()
   const prefersReducedMotion = usePrefersReducedMotion()
+  const queryClient = useQueryClient()
   const { data: session, isPending: sessionPending } = useSession()
   const { data: starCount } = useGitHubStars()
-  const executeMutation = useExecuteAgentInstallation()
+  const {
+    data: chatHistory,
+    isPending: chatHistoryPending,
+    error: chatHistoryError,
+  } = useInstallationChat(installationId, {
+    enabled: Boolean(session?.user),
+  })
+  const { data: pendingUpdates } = usePendingAgentInstallationUpdates({
+    enabled: embedded && Boolean(session?.user),
+  })
+  const pendingUpdate = useMemo(
+    () => pendingUpdates?.updates.find((update) => update.installationId === installationId),
+    [pendingUpdates?.updates, installationId]
+  )
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [historyHydrated, setHistoryHydrated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [fatalError, setFatalError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const stickToBottomRef = useRef(true)
   const ignoreScrollRef = useRef(false)
 
+  const { isStreamingResponse, abortControllerRef, stopStreaming, handleStreamedResponse } =
+    useChatStreaming()
+
   const chatConfig = useMemo(
     () => ({
       title: titleParam || 'Agent',
-      description: 'Чат с установленным агентом. Сообщения выполняются от вашего доступа.',
+      description: 'Чат с установленным агентом. История сохраняется на сервере.',
       customizations: {
         headerText: titleParam || 'Agent',
         welcomeMessage: 'Напишите сообщение — ответ пойдёт через вашу Installation.',
@@ -99,6 +132,24 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
     }),
     [chatConfig.customizations.welcomeMessage]
   )
+
+  useEffect(() => {
+    if (!chatHistory || historyHydrated) return
+    setMessages(
+      chatHistory.messages.map((row) => ({
+        id: row.id,
+        content: row.content,
+        type: row.role,
+        timestamp: new Date(row.createdAt),
+      }))
+    )
+    setHistoryHydrated(true)
+  }, [chatHistory, historyHydrated])
+
+  useEffect(() => {
+    setHistoryHydrated(false)
+    setMessages([])
+  }, [installationId])
 
   const displayMessages: ChatMessage[] = [welcomeChatMessage, ...messages]
 
@@ -143,14 +194,8 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
     }
   }, [])
 
-  const stopRequest = () => {
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = null
-    setIsLoading(false)
-  }
-
   const handleSendMessage = async (messageToSend: string) => {
-    if (!messageToSend.trim() || isLoading) return
+    if (!messageToSend.trim() || isLoading || isStreamingResponse) return
     if (!installationId) {
       setFatalError(CHAT_ERROR_MESSAGES.CHAT_UNAVAILABLE)
       return
@@ -173,93 +218,86 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
     const timeoutId = window.setTimeout(() => abortController.abort(), CHAT_REQUEST_TIMEOUT_MS)
 
     try {
-      // Chat trigger shape: workflow_input = { input: "<message>" } (#6 execute path).
-      const result = await executeMutation.mutateAsync({
-        installationId,
-        input: { input: messageToSend },
+      // boundary-raw-fetch: Installation chat returns SSE consumed by useChatStreaming
+      const response = await fetch(`/api/agent-installations/${installationId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          [AGENT_STREAM_PROTOCOL_HEADER]: AGENT_STREAM_PROTOCOL_V1,
+        },
+        body: JSON.stringify({ message: messageToSend }),
+        credentials: 'same-origin',
         signal: abortController.signal,
       })
 
       window.clearTimeout(timeoutId)
 
-      if (result.status === 'failed' || result.error) {
-        const errText =
-          typeof result.error === 'string'
-            ? result.error
-            : result.error &&
-                typeof result.error === 'object' &&
-                'message' in result.error &&
-                typeof (result.error as { message?: unknown }).message === 'string'
-              ? (result.error as { message: string }).message
-              : CHAT_ERROR_MESSAGES.GENERIC_ERROR
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: generateId(),
-            content: errText,
-            type: 'assistant',
-            timestamp: new Date(),
-          },
-        ])
-      } else {
-        const content =
-          formatInstallationOutput(result.output) ||
-          (result.status === 'completed' ? 'Готово.' : `Статус: ${result.status}`)
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: generateId(),
-            content,
-            type: 'assistant',
-            timestamp: new Date(),
-          },
-        ])
+      if (!response.ok) {
+        let errorText = CHAT_ERROR_MESSAGES.GENERIC_ERROR
+        try {
+          const errorData = (await response.json()) as { error?: string }
+          if (typeof errorData.error === 'string' && errorData.error.trim()) {
+            errorText = errorData.error
+          }
+        } catch {
+          // keep generic
+        }
+        throw new Error(errorText)
       }
-      scrollToBottom({ behavior: 'auto' })
+
+      if (!response.body) {
+        throw new Error('Response body is missing')
+      }
+
+      await handleStreamedResponse(
+        response,
+        setMessages,
+        setIsLoading,
+        () => scrollToBottom({ behavior: 'auto' }),
+        { abortController }
+      )
+
+      await queryClient.invalidateQueries({
+        queryKey: agentInstallationKeys.chat(installationId),
+      })
     } catch (error) {
       window.clearTimeout(timeoutId)
       if (error instanceof Error && error.name === 'AbortError') {
         logger.info('Installation chat request aborted')
+        setIsLoading(false)
         return
       }
-      logger.error('Installation chat execute failed', { error })
+      logger.error('Installation chat stream failed', { error })
+      setIsLoading(false)
       const message =
-        error instanceof ApiClientError
+        error instanceof Error && error.message
           ? error.message
-          : error instanceof Error
-            ? error.message
-            : CHAT_ERROR_MESSAGES.GENERIC_ERROR
+          : CHAT_ERROR_MESSAGES.GENERIC_ERROR
       setMessages((prev) => [
         ...prev,
         {
           id: generateId(),
-          content: message || CHAT_ERROR_MESSAGES.GENERIC_ERROR,
+          content: message,
           type: 'assistant',
           timestamp: new Date(),
         },
       ])
-    } finally {
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null
-      }
-      setIsLoading(false)
     }
   }
 
+  const wrapGate = (node: ReactNode) =>
+    embedded ? <ChatPane>{node}</ChatPane> : <InterfacesShell>{node}</InterfacesShell>
+
   if (sessionPending) {
-    return (
-      <InterfacesShell>
-        <ChatLoadingState />
-      </InterfacesShell>
-    )
+    return wrapGate(<ChatLoadingState />)
   }
 
   if (!session?.user) {
-    const callbackUrl = `/installations/${encodeURIComponent(installationId)}/chat${
-      titleParam ? `?title=${encodeURIComponent(titleParam)}` : ''
-    }`
-    return (
-      <InterfacesShell>
+    // U3: login returns to agent home `/apps/{id}` (legacy `/installations/.../chat` redirects).
+    const callbackUrl = appsInstallationPath(installationId, { title: titleParam })
+    return wrapGate(
+      <>
         <ChatErrorState error='Войдите, чтобы открыть чат Installation.' />
         <div className='flex justify-center pb-10'>
           <Button
@@ -269,26 +307,38 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
             Войти
           </Button>
         </div>
-      </InterfacesShell>
+      </>
     )
+  }
+
+  if (chatHistoryPending && !historyHydrated) {
+    return wrapGate(<ChatLoadingState />)
+  }
+
+  if (chatHistoryError && !historyHydrated) {
+    logger.error('Failed to load Installation chat history', { error: chatHistoryError })
+    return wrapGate(<ChatErrorState error={CHAT_ERROR_MESSAGES.CHAT_UNAVAILABLE} />)
   }
 
   if (fatalError) {
-    return (
-      <InterfacesShell>
-        <ChatErrorState error={fatalError} />
-      </InterfacesShell>
-    )
+    return wrapGate(<ChatErrorState error={fatalError} />)
   }
 
-  return (
-    <ChatViewport>
-      <DesktopTitleBarLane />
+  const chatBody = (
+    <>
+      {!embedded && <DesktopTitleBarLane />}
       <ChatHeader chatConfig={chatConfig} starCount={starCount ?? ''} />
+      {embedded && pendingUpdate ? (
+        <InstallationUpdateControls
+          installationId={pendingUpdate.installationId}
+          pinnedVersion={pendingUpdate.pinnedVersion}
+          latestVersion={pendingUpdate.latestVersion}
+        />
+      ) : null}
 
       <ChatMessageContainer
         messages={displayMessages}
-        isLoading={isLoading}
+        isLoading={isLoading || isStreamingResponse}
         showScrollButton={showScrollButton}
         messagesContainerRef={attachMessagesContainer}
         messagesEndRef={messagesEndRef as RefObject<HTMLDivElement>}
@@ -302,11 +352,13 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
             onSubmit={(value) => {
               void handleSendMessage(value)
             }}
-            isStreaming={isLoading}
-            onStopStreaming={stopRequest}
+            isStreaming={isLoading || isStreamingResponse}
+            onStopStreaming={() => stopStreaming(setMessages)}
           />
         </div>
       </div>
-    </ChatViewport>
+    </>
   )
+
+  return embedded ? <ChatPane>{chatBody}</ChatPane> : <ChatViewport>{chatBody}</ChatViewport>
 }

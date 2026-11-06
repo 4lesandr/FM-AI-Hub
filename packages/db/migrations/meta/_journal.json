@@ -3193,6 +3193,13 @@
       "when": 1794100000000,
       "tag": "0456_agent_release_organization_id",
       "breakpoints": true
+    },
+    {
+      "idx": 457,
+      "version": "7",
+      "when": 1794200000000,
+      "tag": "0457_agent_installation_thread",
+      "breakpoints": true
     }
   ]
 }

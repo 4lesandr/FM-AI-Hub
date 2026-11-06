@@ -97,6 +97,37 @@ export const agentInstallationUpdatePolicySchema = z.enum([
   'current',
 ])
 
+/** One active Installation for agent-home sidebar (U1). */
+export const agentInstallationListItemSchema = z.object({
+  id: nonEmptyIdSchema,
+  /** Workflow / agent display name. */
+  name: z.string(),
+  workflowId: nonEmptyIdSchema,
+  workspaceId: nonEmptyIdSchema.nullable(),
+  pinnedReleaseId: nonEmptyIdSchema,
+  pinnedVersion: z.number().int().positive(),
+  updatePolicy: agentInstallationUpdatePolicySchema,
+  pendingUpdate: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+})
+
+export const listAgentInstallationsResponseSchema = z.object({
+  installations: z.array(agentInstallationListItemSchema),
+})
+
+export type ListAgentInstallationsResponse = z.output<typeof listAgentInstallationsResponseSchema>
+
+/** Session GET: caller's active (non-revoked) Installations for agent home. */
+export const listAgentInstallationsContract = defineRouteContract({
+  method: 'GET',
+  path: '/api/agent-installations',
+  response: {
+    mode: 'json',
+    schema: listAgentInstallationsResponseSchema,
+  },
+})
+
 export const pendingAgentInstallationUpdateSchema = z.object({
   installationId: nonEmptyIdSchema,
   workflowId: nonEmptyIdSchema,
@@ -250,3 +281,49 @@ export const revokeAgentInstallationContract = defineRouteContract({
     schema: revokeAgentInstallationResponseSchema,
   },
 })
+
+/** One persisted turn message for Installation pane history (C3). */
+export const installationChatMessageSchema = z.object({
+  id: nonEmptyIdSchema,
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  createdAt: z.string().datetime(),
+})
+
+export const getInstallationChatResponseSchema = z.object({
+  installationId: nonEmptyIdSchema,
+  threadId: nonEmptyIdSchema,
+  messages: z.array(installationChatMessageSchema),
+})
+
+export type GetInstallationChatResponse = z.output<typeof getInstallationChatResponseSchema>
+
+/** Session GET: active InstallationThread + messages (survives reload). */
+export const getInstallationChatContract = defineRouteContract({
+  method: 'GET',
+  path: '/api/agent-installations/[id]/chat',
+  params: agentInstallationIdParamsSchema,
+  response: {
+    mode: 'json',
+    schema: getInstallationChatResponseSchema,
+  },
+})
+
+export const postInstallationChatBodySchema = z.object({
+  message: z.string().min(1),
+})
+
+/**
+ * Session POST: stream one chat turn (agent-events-v1 SSE) and append to thread.
+ * Response is text/event-stream — not JSON.
+ */
+export const postInstallationChatContract = defineRouteContract({
+  method: 'POST',
+  path: '/api/agent-installations/[id]/chat',
+  params: agentInstallationIdParamsSchema,
+  body: postInstallationChatBodySchema,
+  response: {
+    mode: 'stream',
+  },
+})
+

@@ -7,8 +7,12 @@ import {
   deferAgentInstallationUpdateContract,
   executeAgentInstallationContract,
   type ExecuteAgentInstallationResponse,
+  getInstallationChatContract,
+  type GetInstallationChatResponse,
   installAgentReleaseContract,
   type InstallAgentReleaseResponse,
+  listAgentInstallationsContract,
+  type ListAgentInstallationsResponse,
   listPendingAgentInstallationUpdatesContract,
   type ListPendingAgentInstallationUpdatesResponse,
   resolveAgentReleaseByTokenContract,
@@ -20,7 +24,9 @@ import {
   type PublishAgentReleaseResponse,
 } from '@/lib/api/contracts/agent-releases'
 import {
+  AGENT_INSTALLATION_CHAT_STALE_TIME,
   AGENT_INSTALLATION_UPDATES_STALE_TIME,
+  AGENT_INSTALLATIONS_LIST_STALE_TIME,
   AGENT_RELEASE_BY_TOKEN_STALE_TIME,
   agentInstallationKeys,
 } from '@/hooks/queries/utils/agent-installation-keys'
@@ -41,6 +47,12 @@ async function fetchPendingUpdates(
   return requestJson(listPendingAgentInstallationUpdatesContract, { signal })
 }
 
+async function fetchAgentInstallations(
+  signal?: AbortSignal
+): Promise<ListAgentInstallationsResponse> {
+  return requestJson(listAgentInstallationsContract, { signal })
+}
+
 export function useAgentReleaseByToken(token: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: agentInstallationKeys.byToken(token ?? ''),
@@ -48,6 +60,16 @@ export function useAgentReleaseByToken(token: string | undefined, options?: { en
     enabled: Boolean(token) && (options?.enabled ?? true),
     staleTime: AGENT_RELEASE_BY_TOKEN_STALE_TIME,
     retry: false,
+  })
+}
+
+/** Session list of active Installations for agent-home sidebar (U1). */
+export function useAgentInstallations(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: agentInstallationKeys.list(),
+    queryFn: ({ signal }) => fetchAgentInstallations(signal),
+    enabled: options?.enabled ?? true,
+    staleTime: AGENT_INSTALLATIONS_LIST_STALE_TIME,
   })
 }
 
@@ -70,6 +92,7 @@ export function useInstallAgentRelease() {
     }) => requestJson(installAgentReleaseContract, { body }),
     onSuccess: async (result: InstallAgentReleaseResponse, variables) => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agentInstallationKeys.list() }),
         queryClient.invalidateQueries({ queryKey: agentInstallationKeys.updates() }),
         queryClient.invalidateQueries({
           queryKey: agentInstallationKeys.byToken(variables.shareToken),
@@ -79,7 +102,6 @@ export function useInstallAgentRelease() {
     },
   })
 }
-
 /** Session Publish → AgentRelease + Install share URL (`/install/{token}`). */
 export function usePublishAgentRelease() {
   const queryClient = useQueryClient()
@@ -156,5 +178,25 @@ export function useExecuteAgentInstallation() {
         },
         signal,
       }),
+  })
+}
+
+async function fetchInstallationChat(
+  installationId: string,
+  signal?: AbortSignal
+): Promise<GetInstallationChatResponse> {
+  return requestJson(getInstallationChatContract, {
+    params: { id: installationId },
+    signal,
+  })
+}
+
+/** Session GET: InstallationThread history for pane hydrate after reload (C3). */
+export function useInstallationChat(installationId: string | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: agentInstallationKeys.chat(installationId ?? ''),
+    queryFn: ({ signal }) => fetchInstallationChat(installationId as string, signal),
+    enabled: Boolean(installationId) && (options?.enabled ?? true),
+    staleTime: AGENT_INSTALLATION_CHAT_STALE_TIME,
   })
 }
