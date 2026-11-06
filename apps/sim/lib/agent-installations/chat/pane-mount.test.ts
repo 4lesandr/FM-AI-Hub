@@ -47,12 +47,31 @@ describe('C4 pane mount /apps/{id}', () => {
     expect(chat).not.toContain('embedded')
   })
 
-  test('C1 seam: stream turn delegates body to pane-turn-runner', () => {
+  test('C1 seam: stream turn delegates body to pane-turn-runner (loop lives there)', () => {
     const stream = readFileSync(
       join(simRoot, 'lib/agent-installations/chat/stream-chat-turn.ts'),
       'utf8'
     )
     expect(stream).toContain('runInstallationPaneTurn')
+    // Stream owns SSE; tool dispatch stays inside agent loop / pane-turn-runner.
     expect(stream).not.toContain('dispatchInstallationAgentTool')
+  })
+
+  test('C1 pane-turn-runner uses agent loop, not one-shot-only dispatch body', () => {
+    const runner = readFileSync(
+      join(simRoot, 'lib/agent-installations/chat/pane-turn-runner.ts'),
+      'utf8'
+    )
+    expect(runner).toContain('runInstallationAgentLoop')
+    expect(runner).not.toContain('pre-C1')
+    expect(runner).not.toMatch(/fallback \(pre-C1 loop\)/)
+
+    const loop = readFileSync(
+      join(simRoot, 'lib/agent-installations/chat/agent-loop.ts'),
+      'utf8'
+    )
+    expect(loop).toContain('INSTALLATION_AGENT_SYSTEM_PROMPT')
+    expect(loop).toContain('dispatchInstallationAgentTool')
+    expect(loop).toContain('RUN_INSTALLATION_TOOL_NAME')
   })
 })
