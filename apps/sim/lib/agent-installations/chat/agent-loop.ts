@@ -103,7 +103,8 @@ function isMetaOnlyUserMessage(text: string): boolean {
   const t = text.trim().toLowerCase()
   if (!t) return true
   if (t.length > 80) return false
-  return /^(привет|hello|hi|hey|help|помощь|что ты умеешь|кто ты|what can you do|capabilities)\b/.test(
+  // No trailing \b: JS \w is ASCII-only, so Cyrillic phrases never get a word-boundary.
+  return /^(привет|hello|hi|hey|help|помощь|что ты умеешь|кто ты|what can you do|capabilities)([!?.]|$)/.test(
     t
   )
 }
