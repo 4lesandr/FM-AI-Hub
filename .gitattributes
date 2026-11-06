@@ -41,3 +41,7 @@ Dockerfile* text eol=lf
 *.ttf binary
 *.eot binary
 *.pdf binary
+
+# Drizzle schema snapshots are machine-generated full dumps (~1MB each).
+# Hide from review diffs; GitHub collapses via linguist-generated.
+packages/db/migrations/meta/*_snapshot.json -diff linguist-generated=true
