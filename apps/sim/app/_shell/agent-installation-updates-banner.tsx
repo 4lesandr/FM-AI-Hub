@@ -3,16 +3,31 @@
 import { Badge, Banner, Button } from '@sim/emcn'
 import { useRouter } from 'next/navigation'
 import { useSession } from '@/lib/auth/client'
-import { appsInstallationPath } from '@/lib/navigation/installation-paths'
+import {
+  appsInstallationPath,
+  legacyAppsInstallationPath,
+} from '@/lib/navigation/installation-paths'
 import {
   useAcceptAgentInstallationUpdate,
   useDeferAgentInstallationUpdate,
   usePendingAgentInstallationUpdates,
 } from '@/hooks/queries/agent-installations'
 
+function chatHrefForUpdate(update: {
+  installationId: string
+  workflowName: string
+  workspaceId: string | null
+}): string {
+  if (update.workspaceId) {
+    return appsInstallationPath(update.workspaceId, update.installationId, {
+      title: update.workflowName,
+    })
+  }
+  return legacyAppsInstallationPath(update.installationId, { title: update.workflowName })
+}
+
 /**
  * Session badge for pending agent Installation updates (Publish N+1 channel).
- * Workspace chrome; agent-home also surfaces Accept/Defer in /apps rail + pane (U4).
  */
 export function AgentInstallationUpdatesBanner() {
   const router = useRouter()
@@ -28,6 +43,21 @@ export function AgentInstallationUpdatesBanner() {
   }
 
   const busy = acceptMutation.isPending || deferMutation.isPending
+
+  const handleAccept = async (update: (typeof updates)[number]) => {
+    try {
+      const result = await acceptMutation.mutateAsync(update.installationId)
+      if (result.installationId !== update.installationId && update.workspaceId) {
+        router.push(
+          appsInstallationPath(update.workspaceId, result.installationId, {
+            title: update.workflowName,
+          })
+        )
+      }
+    } catch {
+      // surfaced via mutation error state
+    }
+  }
 
   return (
     <Banner role='status' className='border-b border-[var(--border)]'>
@@ -51,7 +81,7 @@ export function AgentInstallationUpdatesBanner() {
                 size='sm'
                 variant='default'
                 disabled={busy}
-                onClick={() => void acceptMutation.mutateAsync(update.installationId)}
+                onClick={() => void handleAccept(update)}
               >
                 Accept
               </Button>
@@ -68,11 +98,7 @@ export function AgentInstallationUpdatesBanner() {
                 type='button'
                 size='sm'
                 variant='ghost'
-                onClick={() =>
-                  router.push(
-                    appsInstallationPath(update.installationId, { title: update.workflowName })
-                  )
-                }
+                onClick={() => router.push(chatHrefForUpdate(update))}
               >
                 Чат
               </Button>

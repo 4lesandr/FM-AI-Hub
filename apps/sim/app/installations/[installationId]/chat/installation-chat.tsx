@@ -4,7 +4,7 @@ import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Button, usePrefersReducedMotion } from '@sim/emcn'
 import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
-import { InstallationUpdateControls } from '@/app/apps/components/installation-update-controls'
+import { InstallationUpdateControls } from '@/app/workspace/[workspaceId]/apps/components/installation-update-controls'
 import {
   ChatErrorState,
   ChatHeader,
@@ -21,7 +21,7 @@ import {
   AGENT_STREAM_PROTOCOL_HEADER,
   AGENT_STREAM_PROTOCOL_V1,
 } from '@/lib/workflows/streaming/agent-stream-protocol'
-import { appsInstallationPath } from '@/lib/navigation/installation-paths'
+import { appsInstallationPath, legacyAppsInstallationPath } from '@/lib/navigation/installation-paths'
 import {
   useInstallationChat,
   usePendingAgentInstallationUpdates,
@@ -29,7 +29,7 @@ import {
 import { agentInstallationKeys } from '@/hooks/queries/utils/agent-installation-keys'
 import { useGitHubStars } from '@/hooks/queries/github-stars'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
 const logger = createLogger('InstallationChat')
 
@@ -56,6 +56,8 @@ interface InstallationChatProps {
  */
 export function InstallationChat({ installationId }: InstallationChatProps) {
   const router = useRouter()
+  const params = useParams<{ workspaceId?: string }>()
+  const workspaceId = params.workspaceId
   const searchParams = useSearchParams()
   const titleParam = searchParams.get('title')?.trim()
   const prefersReducedMotion = usePrefersReducedMotion()
@@ -276,7 +278,9 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
 
   if (!session?.user) {
     // Login returns to agent home `/apps/{id}` (legacy `/installations/.../chat` redirects).
-    const callbackUrl = appsInstallationPath(installationId, { title: titleParam })
+    const callbackUrl = workspaceId
+      ? appsInstallationPath(workspaceId, installationId, { title: titleParam })
+      : legacyAppsInstallationPath(installationId, { title: titleParam })
     return (
       <ChatPane>
         <ChatErrorState error='Войдите, чтобы открыть чат Installation.' />
@@ -320,8 +324,9 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
   return (
     <ChatPane>
       <ChatHeader chatConfig={chatConfig} starCount={starCount ?? ''} />
-      {pendingUpdate ? (
+      {pendingUpdate && workspaceId ? (
         <InstallationUpdateControls
+          workspaceId={workspaceId}
           installationId={pendingUpdate.installationId}
           pinnedVersion={pendingUpdate.pinnedVersion}
           latestVersion={pendingUpdate.latestVersion}

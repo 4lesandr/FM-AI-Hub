@@ -16,7 +16,7 @@ export default async function HomePage({ params }: { params: Promise<{ workspace
   // The layout redirects too, but pages and layouts resolve concurrently — without
   // this the page still renders on its way out.
   if (!isChatEnabled) {
-    redirect(`/workspace/${workspaceId}`)
+    redirect(`/workspace/${workspaceId}/apps`)
   }
 
   const session = await getSession()

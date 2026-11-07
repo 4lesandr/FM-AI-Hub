@@ -112,8 +112,16 @@ export function InstallByToken() {
         ? 'Не удалось отозвать установку'
         : null)
 
+  const resolvedWorkspaceId = workspaceId.trim() || meta?.installation?.workspaceId || ''
+
   const openChat = (id: string) => {
-    router.push(installationChatPath(id, { title: meta?.workflowName }))
+    if (!resolvedWorkspaceId) {
+      setFormError('Выберите workspace')
+      return
+    }
+    router.push(
+      installationChatPath(resolvedWorkspaceId, id, { title: meta?.workflowName })
+    )
   }
 
   const onInstall = async () => {
@@ -139,7 +147,11 @@ export function InstallByToken() {
         credentialBindings,
       })
       setDoneId(result.installationId)
-      router.push(installationChatPath(result.installationId, { title: meta?.workflowName }))
+      router.push(
+        installationChatPath(workspaceId.trim(), result.installationId, {
+          title: meta?.workflowName,
+        })
+      )
     } catch {
       // surfaced via mutation error
     }
@@ -151,6 +163,9 @@ export function InstallByToken() {
     try {
       const result = await acceptMutation.mutateAsync(meta.installation.id)
       setDoneId(result.installationId)
+      if (resolvedWorkspaceId && result.installationId !== meta.installation.id) {
+        openChat(result.installationId)
+      }
     } catch {
       // surfaced via mutation error
     }

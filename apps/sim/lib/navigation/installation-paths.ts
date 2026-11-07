@@ -8,20 +8,25 @@ export function installByTokenPath(token: string): string {
   return `/install/${encodeURIComponent(token)}`
 }
 
-/** Agent-home rail: list of Installations (U2). */
-export function appsHomePath(): string {
-  return '/apps'
+function workspaceAppsBase(workspaceId: string): string {
+  return `/workspace/${encodeURIComponent(workspaceId)}/apps`
+}
+
+/** Workspace Installations list (empty pane until one is opened). */
+export function appsHomePath(workspaceId: string): string {
+  return workspaceAppsBase(workspaceId)
 }
 
 /**
- * Agent-home pane for one Installation (shell + chat).
+ * Workspace pane for one Installation (sidebar + chat).
  * Optional `title` is display-only for the chat header.
  */
 export function appsInstallationPath(
+  workspaceId: string,
   installationId: string,
   options?: { title?: string | null }
 ): string {
-  const base = `/apps/${encodeURIComponent(installationId)}`
+  const base = `${workspaceAppsBase(workspaceId)}/${encodeURIComponent(installationId)}`
   const title = options?.title?.trim()
   if (!title) return base
   return `${base}?title=${encodeURIComponent(title)}`
@@ -29,13 +34,30 @@ export function appsInstallationPath(
 
 /**
  * Canonical post-Install / deep-link destination for Installation chat.
- * Points at agent home (`/apps/{id}`), not LogoShell and not Publisher `/w/...`.
  */
 export function installationChatPath(
+  workspaceId: string,
   installationId: string,
   options?: { title?: string | null }
 ): string {
-  return appsInstallationPath(installationId, options)
+  return appsInstallationPath(workspaceId, installationId, options)
+}
+
+/**
+ * Legacy top-level `/apps` URLs — kept for short redirects from old bookmarks.
+ */
+export function legacyAppsHomePath(): string {
+  return '/apps'
+}
+
+export function legacyAppsInstallationPath(
+  installationId: string,
+  options?: { title?: string | null }
+): string {
+  const base = `/apps/${encodeURIComponent(installationId)}`
+  const title = options?.title?.trim()
+  if (!title) return base
+  return `${base}?title=${encodeURIComponent(title)}`
 }
 
 /**

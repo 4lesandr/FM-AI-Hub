@@ -75,6 +75,7 @@ export async function createInstallationChatTurnStream(
         const turn = await runInstallationPaneTurn({
           principal: input.principal,
           installationId: installation.installationId,
+          workspaceId: installation.workspaceId,
           message,
           requestId: input.requestId,
           abortSignal: input.abortSignal,

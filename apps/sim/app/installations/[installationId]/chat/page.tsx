@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { appsInstallationPath } from '@/lib/navigation/installation-paths'
+import { getSession } from '@/lib/auth'
+import { legacyInstallationChatPath } from '@/lib/navigation/installation-paths'
+import { resolveAgentAppsInstallationDestination } from '@/lib/navigation/resolve-agent-apps-destination.server'
+import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
 
 export const metadata: Metadata = {
   title: 'Installation chat',
@@ -15,17 +18,26 @@ interface LegacyInstallationChatRedirectProps {
 }
 
 /**
- * U3: deep link `/installations/{id}/chat` → agent home `/apps/{id}` (rail + chat).
- * Keeps `title` query when present. Publisher `/workspace/.../w/...` is untouched.
+ * Legacy `/installations/{id}/chat` → workspace Installation pane.
  */
 export default async function LegacyInstallationChatRedirect({
   params,
   searchParams,
 }: LegacyInstallationChatRedirectProps) {
+  const session = await getSession()
   const { installationId } = await params
   const query = await searchParams
   const titleRaw = query.title
   const title = typeof titleRaw === 'string' ? titleRaw : Array.isArray(titleRaw) ? titleRaw[0] : null
 
-  redirect(appsInstallationPath(installationId, { title }))
+  if (!session?.user) {
+    redirect(
+      buildAuthCrossLink('/login', {
+        callbackUrl: legacyInstallationChatPath(installationId, { title }),
+        isInviteFlow: false,
+      })
+    )
+  }
+
+  redirect(await resolveAgentAppsInstallationDestination(session, installationId, title))
 }

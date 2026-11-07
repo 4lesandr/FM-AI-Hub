@@ -22,20 +22,56 @@ interface UseCopyToClipboardReturn {
 }
 
 /**
+ * Legacy copy for non-secure contexts (`http://` IP stands): Clipboard API is
+ * unavailable outside https/localhost, so Publish "Copy link" otherwise fails silently.
+ */
+function writeTextViaExecCommand(text: string): void {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '0'
+  textarea.style.left = '0'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  textarea.setSelectionRange(0, text.length)
+  const ok = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  if (!ok) throw new Error('execCommand copy failed')
+}
+
+async function writePlainText(text: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // Fall through: insecure origin or denied permission.
+    }
+  }
+  writeTextViaExecCommand(text)
+}
+
+/**
  * Starts an async clipboard write while the caller still has transient user activation.
  * Deferred text uses `ClipboardItem` when available and an immediate fallback otherwise.
+ * Falls back to `document.execCommand('copy')` on http stands (no secure clipboard).
  */
 export function writeTextToClipboard(content: ClipboardContent): Promise<void> {
-  if (typeof content === 'string') return navigator.clipboard.writeText(content)
+  if (typeof content === 'string') return writePlainText(content)
 
-  if (typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard.write === 'function') {
+  if (typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function') {
     const blob = Promise.resolve()
       .then(() => content.prepare())
       .then((value) => new Blob([value], { type: 'text/plain' }))
-    return navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })])
+    return navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]).catch(() =>
+      writePlainText(content.fallback)
+    )
   }
 
-  return navigator.clipboard.writeText(content.fallback)
+  return writePlainText(content.fallback)
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   runInstallationAgentLoop,
   type InstallationAgentDecide,
 } from '@/lib/agent-installations/chat/agent-loop'
+import { createInstallationAgentDecide } from '@/lib/agent-installations/chat/installation-llm-decide'
 import type { RunInstallationToolResult } from '@/lib/agent-installations/chat/tools'
 
 const logger = createLogger('InstallationChat.PaneTurnRunner')
@@ -30,6 +31,7 @@ export interface PaneTurnResult {
 export interface RunInstallationPaneTurnInput {
   principal: SessionPrincipal
   installationId: string
+  workspaceId?: string | null
   message: string
   requestId: string
   abortSignal?: AbortSignal
@@ -55,6 +57,13 @@ export async function runInstallationPaneTurn(
     requestId: input.requestId,
   })
 
+  const decide =
+    input.decide ??
+    (await createInstallationAgentDecide({
+      workspaceId: input.workspaceId,
+      abortSignal: input.abortSignal,
+    }))
+
   const turn = await runInstallationAgentLoop({
     context: {
       principal: input.principal,
@@ -64,7 +73,7 @@ export async function runInstallationPaneTurn(
       requestHeaders: input.requestHeaders,
     },
     message: input.message,
-    decide: input.decide,
+    decide,
     onToolEvent: input.onToolEvent,
   })
 

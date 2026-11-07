@@ -8,15 +8,15 @@ import {
 
 const simRoot = join(import.meta.dir, '../../../')
 
-describe('C4 pane mount /apps/{id}', () => {
-  test('canonical chat path is agent-home pane, not LogoShell legacy', () => {
-    expect(installationChatPath('inst-1')).toBe('/apps/inst-1')
-    expect(appsInstallationPath('inst-1')).toBe('/apps/inst-1')
+describe('C4 pane mount workspace apps/{id}', () => {
+  test('canonical chat path is workspace pane, not LogoShell legacy', () => {
+    expect(installationChatPath('ws-1', 'inst-1')).toBe('/workspace/ws-1/apps/inst-1')
+    expect(appsInstallationPath('ws-1', 'inst-1')).toBe('/workspace/ws-1/apps/inst-1')
   })
 
-  test('/apps/[installationId] mounts InstallationChat without LogoShell', () => {
+  test('workspace apps/[installationId] mounts InstallationChat without LogoShell', () => {
     const page = readFileSync(
-      join(simRoot, 'app/apps/[installationId]/page.tsx'),
+      join(simRoot, 'app/workspace/[workspaceId]/apps/[installationId]/page.tsx'),
       'utf8'
     )
     expect(page).toContain('InstallationChat')
@@ -26,11 +26,10 @@ describe('C4 pane mount /apps/{id}', () => {
     expect(page).not.toContain('embedded')
   })
 
-  test('apps layout is WorkspaceChrome rail, not LogoShell', () => {
-    const layout = readFileSync(join(simRoot, 'app/apps/layout.tsx'), 'utf8')
-    expect(layout).toContain('AgentAppsSidebar')
-    expect(layout).toContain('WorkspaceChrome')
-    expect(layout).not.toContain('LogoShell')
+  test('legacy /apps redirect resolves to workspace destination', () => {
+    const page = readFileSync(join(simRoot, 'app/apps/[installationId]/page.tsx'), 'utf8')
+    expect(page).toContain('resolveAgentAppsInstallationDestination')
+    expect(page).not.toContain('AgentAppsSidebar')
   })
 
   test('InstallationChat has no LogoShell / InterfacesShell fallback', () => {
@@ -53,7 +52,6 @@ describe('C4 pane mount /apps/{id}', () => {
       'utf8'
     )
     expect(stream).toContain('runInstallationPaneTurn')
-    // Stream owns SSE; tool dispatch stays inside agent loop / pane-turn-runner.
     expect(stream).not.toContain('dispatchInstallationAgentTool')
   })
 

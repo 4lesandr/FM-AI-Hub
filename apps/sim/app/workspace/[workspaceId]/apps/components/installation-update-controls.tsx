@@ -1,12 +1,15 @@
 'use client'
 
 import { Badge, Button, cn } from '@sim/emcn'
+import { useRouter } from 'next/navigation'
+import { appsInstallationPath } from '@/lib/navigation/installation-paths'
 import {
   useAcceptAgentInstallationUpdate,
   useDeferAgentInstallationUpdate,
 } from '@/hooks/queries/agent-installations'
 
 export interface InstallationUpdateControlsProps {
+  workspaceId: string
   installationId: string
   pinnedVersion: number
   latestVersion: number
@@ -16,19 +19,41 @@ export interface InstallationUpdateControlsProps {
 }
 
 /**
- * Accept / Defer for a pending Installation update on the agent-home side (/apps).
- * Reuses the same session mutations as the workspace chrome banner (U4).
+ * Accept / Defer for a pending Installation update in the workspace shell.
  */
 export function InstallationUpdateControls({
+  workspaceId,
   installationId,
   pinnedVersion,
   latestVersion,
   compact = false,
   className,
 }: InstallationUpdateControlsProps) {
+  const router = useRouter()
   const acceptMutation = useAcceptAgentInstallationUpdate()
   const deferMutation = useDeferAgentInstallationUpdate()
   const busy = acceptMutation.isPending || deferMutation.isPending
+
+  const handleAccept = async () => {
+    try {
+      const result = await acceptMutation.mutateAsync(installationId)
+      if (result.installationId !== installationId) {
+        router.replace(
+          appsInstallationPath(workspaceId, result.installationId, { title: null })
+        )
+      }
+    } catch {
+      // mutation error surfaces via React Query state
+    }
+  }
+
+  const handleDefer = async () => {
+    try {
+      await deferMutation.mutateAsync(installationId)
+    } catch {
+      // mutation error surfaces via React Query state
+    }
+  }
 
   return (
     <div
@@ -56,7 +81,7 @@ export function InstallationUpdateControls({
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            void acceptMutation.mutateAsync(installationId)
+            void handleAccept()
           }}
         >
           Accept
@@ -69,7 +94,7 @@ export function InstallationUpdateControls({
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            void deferMutation.mutateAsync(installationId)
+            void handleDefer()
           }}
         >
           Defer

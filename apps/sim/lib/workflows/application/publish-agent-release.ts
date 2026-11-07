@@ -2,12 +2,13 @@ import { resolvePrincipalSubjectUserId } from '@sim/auth/principal'
 import { agentInstallation, agentRelease, db } from '@sim/db'
 import { createLogger } from '@sim/logger'
 import { generateId, generateShortId } from '@sim/utils/id'
-import { and, eq, inArray, isNull, max, ne } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, max, ne } from 'drizzle-orm'
 import {
   hardenAgentReleaseSnapshot,
   resolveAgentReleasePromptTier,
   type AgentReleasePromptTier,
 } from '@/lib/agent-installations/harden-release-snapshot'
+import { areAgentReleaseSnapshotsEqual } from '@/lib/agent-installations/release-snapshot-equality'
 import { redactAgentReleaseVariableValues } from '@/lib/agent-installations/redact-release-variables'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { getBaseUrl } from '@/lib/core/utils/urls'
@@ -87,6 +88,46 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       } as Partial<WorkflowState>,
       { promptTier }
     )
+
+    const [activeRelease] = await db
+      .select({
+        id: agentRelease.id,
+        version: agentRelease.version,
+        shareToken: agentRelease.shareToken,
+        createdAt: agentRelease.createdAt,
+        state: agentRelease.state,
+      })
+      .from(agentRelease)
+      .where(
+        and(eq(agentRelease.workflowId, context.workflowId), isNull(agentRelease.shareRevokedAt))
+      )
+      .orderBy(desc(agentRelease.version))
+      .limit(1)
+
+    if (activeRelease && areAgentReleaseSnapshotsEqual(releaseState, activeRelease.state)) {
+      const shareUrl = `${getBaseUrl()}/install/${activeRelease.shareToken}`
+      logger.info('Reused existing agent release (unchanged snapshot)', {
+        workflowId: context.workflowId,
+        workspaceId: context.workspaceId,
+        releaseId: activeRelease.id,
+        version: activeRelease.version,
+        promptTier,
+        principalKind: principal.kind,
+      })
+      return {
+        releaseId: activeRelease.id,
+        workflowId: context.workflowId,
+        workspaceId: context.workspaceId,
+        organizationId: context.workspaceOrganizationId,
+        version: activeRelease.version,
+        shareToken: activeRelease.shareToken,
+        shareUrl,
+        createdAt: activeRelease.createdAt.toISOString(),
+        installationsMarkedPending: 0,
+        sharesRevoked: 0,
+        promptTier,
+      }
+    }
 
     const releaseId = generateId()
     const shareToken = generateShortId(SHARE_TOKEN_LENGTH)

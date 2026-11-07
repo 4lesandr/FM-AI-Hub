@@ -27,3 +27,13 @@ Localdev sync без печати значений: `deploy/bin/localdev-fvks-en
 ```bash
 kubectl -n hub create secret generic hub-secrets --from-env-file=hub-secrets.env
 ```
+
+## Self-host Chat (FM AI Hub)
+
+На контуре без mothership Copilot:
+
+```bash
+NEXT_PUBLIC_CHAT_DISABLED=true
+```
+
+Иначе workspace Home ходит в mothership → Unauthorized. Свой чат — Installation pane в `/workspace/{id}/apps`.

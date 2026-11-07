@@ -16,5 +16,5 @@ export default async function WorkspacePage({
   params: Promise<{ workspaceId: string }>
 }) {
   const { workspaceId } = await params
-  redirect(`/workspace/${workspaceId}/${isChatEnabled ? 'home' : 'w'}`)
+  redirect(`/workspace/${workspaceId}/${isChatEnabled ? 'home' : 'apps'}`)
 }

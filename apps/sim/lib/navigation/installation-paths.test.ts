@@ -1,38 +1,31 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import {
   appsHomePath,
   appsInstallationPath,
   installationChatPath,
-  installByTokenPath,
-  legacyInstallationChatPath,
+  legacyAppsHomePath,
+  legacyAppsInstallationPath,
 } from '@/lib/navigation/installation-paths'
 
-describe('installation-paths (U3 agent-first routing)', () => {
-  test('installByTokenPath encodes token', () => {
-    expect(installByTokenPath('abc/def')).toBe('/install/abc%2Fdef')
+describe('installation paths', () => {
+  const workspaceId = 'ws-1'
+
+  test('apps home under workspace chrome', () => {
+    expect(appsHomePath(workspaceId)).toBe('/workspace/ws-1/apps')
+    expect(legacyAppsHomePath()).toBe('/apps')
   })
 
-  test('apps home and installation pane', () => {
-    expect(appsHomePath()).toBe('/apps')
-    expect(appsInstallationPath('inst-1')).toBe('/apps/inst-1')
-    expect(appsInstallationPath('inst-1', { title: 'Test Chat Agent' })).toBe(
-      '/apps/inst-1?title=Test%20Chat%20Agent'
+  test('apps installation pane encodes id and optional title', () => {
+    expect(appsInstallationPath(workspaceId, 'inst-1')).toBe('/workspace/ws-1/apps/inst-1')
+    expect(appsInstallationPath(workspaceId, 'inst-1', { title: 'Test Chat Agent' })).toBe(
+      '/workspace/ws-1/apps/inst-1?title=Test%20Chat%20Agent'
     )
+    expect(legacyAppsInstallationPath('inst-1')).toBe('/apps/inst-1')
   })
 
-  test('installationChatPath is agent home, not LogoShell or workspace console', () => {
-    const path = installationChatPath('inst-9', { title: 'Agent' })
-    expect(path).toBe('/apps/inst-9?title=Agent')
-    expect(path.startsWith('/apps/')).toBe(true)
-    expect(path.includes('/workspace/')).toBe(false)
-    expect(path.includes('/w/')).toBe(false)
-    expect(path).toBe(appsInstallationPath('inst-9', { title: 'Agent' }))
-  })
-
-  test('legacyInstallationChatPath keeps pre-U3 shape for redirects', () => {
-    expect(legacyInstallationChatPath('inst-9')).toBe('/installations/inst-9/chat')
-    expect(legacyInstallationChatPath('inst-9', { title: 'Agent' })).toBe(
-      '/installations/inst-9/chat?title=Agent'
-    )
+  test('installationChatPath is workspace Installation pane', () => {
+    const path = installationChatPath(workspaceId, 'inst-9', { title: 'Agent' })
+    expect(path).toBe('/workspace/ws-1/apps/inst-9?title=Agent')
+    expect(path).toBe(appsInstallationPath(workspaceId, 'inst-9', { title: 'Agent' }))
   })
 })

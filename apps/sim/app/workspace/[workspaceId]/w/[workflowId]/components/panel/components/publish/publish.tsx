@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Button,
   Chip,
+  ChipInput,
   ChipModal,
   ChipModalBody,
   ChipModalField,
@@ -10,9 +12,9 @@ import {
   ChipModalHeader,
   Tooltip,
   toast,
-  useCopyToClipboard,
+  writeTextToClipboard,
 } from '@sim/emcn'
-import { Check, Link } from '@sim/emcn/icons'
+import { Check, Duplicate, Link } from '@sim/emcn/icons'
 import { getErrorMessage } from '@sim/utils/errors'
 import type { PublishAgentReleaseResponse } from '@/lib/api/contracts/agent-releases'
 import { useRegisterGlobalCommands } from '@/app/workspace/[workspaceId]/providers/global-commands-provider'
@@ -27,6 +29,8 @@ interface PublishProps {
   disabled?: boolean
 }
 
+const COPY_FEEDBACK_MS = 2000
+
 /**
  * Editor Publish chip: session POST → AgentRelease, then show/copy Install share link.
  * Same Chip / ChipModal chrome as Deploy and file share.
@@ -34,16 +38,45 @@ interface PublishProps {
 export function Publish({ activeWorkflowId, userPermissions, disabled = false }: PublishProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [release, setRelease] = useState<PublishAgentReleaseResponse | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const installLinkRef = useRef<HTMLInputElement>(null)
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hydrationPhase = useWorkflowRegistry((state) => state.hydration.phase)
   const isRegistryLoading = hydrationPhase === 'idle' || hydrationPhase === 'state-loading'
   const { hasBlocks } = useCurrentWorkflow()
   const publishMutation = usePublishAgentRelease()
-  const { copied, copy } = useCopyToClipboard()
 
   const isEmpty = !hasBlocks()
   const canPublish = userPermissions.canEdit
   const isPublishing = publishMutation.isPending
   const isDisabled = disabled || isPublishing || !canPublish || isEmpty || !activeWorkflowId
+
+  const shareUrl = release?.shareUrl ?? ''
+
+  useEffect(
+    () => () => {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current)
+    },
+    []
+  )
+
+  const copyInstallLink = useCallback(async () => {
+    if (!shareUrl) return
+    try {
+      // writeTextToClipboard falls back on http stands (Clipboard API needs secure context).
+      await writeTextToClipboard(shareUrl)
+      setLinkCopied(true)
+      if (copyResetRef.current) clearTimeout(copyResetRef.current)
+      copyResetRef.current = setTimeout(() => setLinkCopied(false), COPY_FEEDBACK_MS)
+    } catch {
+      toast({ message: 'Не скопировалось — выделите ссылку и скопируйте вручную' })
+      const input = installLinkRef.current
+      if (input) {
+        input.focus()
+        input.select()
+      }
+    }
+  }, [shareUrl])
 
   const getTooltipText = () => {
     if (isEmpty) return 'Cannot publish an empty workflow'
@@ -82,8 +115,6 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
     setIsModalOpen(false)
   }
 
-  const shareUrl = release?.shareUrl ?? ''
-
   return (
     <>
       <Tooltip.Root>
@@ -115,12 +146,42 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
         </ChipModalHeader>
         <ChipModalBody>
           <ChipModalField
-            type='copy'
+            type='custom'
             title='Install link'
             hint='Org-bound Install link. Secrets/ENV names redacted; prompts are shared IP (use promptTier strip-system to clear system prompts).'
-            value={shareUrl}
-            copyLabel='Copy install link'
-          />
+          >
+            {(aria) => (
+              <ChipInput
+                ref={installLinkRef}
+                readOnly
+                value={shareUrl}
+                inputClassName='cursor-text select-all'
+                endAdornment={
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <Button
+                        type='button'
+                        variant='quiet'
+                        size='icon'
+                        onClick={() => void copyInstallLink()}
+                        aria-label='Copy install link'
+                      >
+                        {linkCopied ? (
+                          <Check className='size-[13px]' />
+                        ) : (
+                          <Duplicate className='size-[13px]' />
+                        )}
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>
+                      {linkCopied ? 'Copied!' : 'Copy install link'}
+                    </Tooltip.Content>
+                  </Tooltip.Root>
+                }
+                {...aria}
+              />
+            )}
+          </ChipModalField>
         </ChipModalBody>
         <ChipModalFooter
           onCancel={handleClose}
@@ -131,12 +192,10 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
                   {
                     custom: (
                       <Chip
-                        leftIcon={copied ? Check : Link}
-                        onClick={() => {
-                          void copy(shareUrl)
-                        }}
+                        leftIcon={linkCopied ? Check : Link}
+                        onClick={() => void copyInstallLink()}
                       >
-                        {copied ? 'Copied!' : 'Copy link'}
+                        {linkCopied ? 'Copied!' : 'Copy link'}
                       </Chip>
                     ),
                   },

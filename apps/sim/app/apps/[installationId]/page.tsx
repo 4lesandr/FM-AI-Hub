@@ -1,25 +1,33 @@
-import { Suspense } from 'react'
-import type { Metadata } from 'next'
-import { ChatLoadingState } from '@/app/(interfaces)/chat/components'
-import { InstallationChat } from '@/app/installations/[installationId]/chat/installation-chat'
-
-export const metadata: Metadata = {
-  title: 'Приложение',
-  robots: { index: false },
-}
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
+import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
+import { legacyAppsInstallationPath } from '@/lib/navigation/installation-paths'
+import { resolveAgentAppsInstallationDestination } from '@/lib/navigation/resolve-agent-apps-destination.server'
 
 export const dynamic = 'force-dynamic'
 
-interface AppsInstallationPageProps {
+interface LegacyAppsInstallationRedirectProps {
   params: Promise<{ installationId: string }>
+  searchParams: Promise<{ title?: string }>
 }
 
-export default async function AppsInstallationPage({ params }: AppsInstallationPageProps) {
+/** Legacy `/apps/[installationId]` → workspace Installation chat pane. */
+export default async function LegacyAppsInstallationRedirect({
+  params,
+  searchParams,
+}: LegacyAppsInstallationRedirectProps) {
+  const session = await getSession()
   const { installationId } = await params
+  const { title } = await searchParams
 
-  return (
-    <Suspense fallback={<ChatLoadingState />}>
-      <InstallationChat installationId={installationId} />
-    </Suspense>
-  )
+  if (!session?.user) {
+    redirect(
+      buildAuthCrossLink('/login', {
+        callbackUrl: legacyAppsInstallationPath(installationId, { title }),
+        isInviteFlow: false,
+      })
+    )
+  }
+
+  redirect(await resolveAgentAppsInstallationDestination(session, installationId, title))
 }

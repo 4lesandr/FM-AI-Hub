@@ -306,11 +306,10 @@ export const workflowOperations = {
    */
   publish: defineWorkspaceOperation({
     id: 'workflows.publish',
-    oauthScope: 'api:write',
     minimumRole: 'write',
     workspaceApiKey: 'deny',
     capability: 'none',
-    contentDelivery: 'none',
+    // session-only MVP: no oauthScope / contentDelivery / Copilot (assert*Declaration)
     principalKinds: ['session'],
   }),
   deploy: defineWorkspaceOperation({

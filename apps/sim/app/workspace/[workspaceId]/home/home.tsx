@@ -23,7 +23,6 @@ import { captureEvent } from '@/lib/posthog/client'
 import { persistImportedWorkflow } from '@/lib/workflows/operations/import-export'
 import { ChatResourcePanel } from '@/app/workspace/[workspaceId]/home/components/chat-resource-panel'
 import { RESOURCE_HEADER_CLASSES } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-tabs/resource-tab-controls'
-import { SuggestedActions } from '@/app/workspace/[workspaceId]/home/components/suggested-actions'
 import { HomeFallback } from '@/app/workspace/[workspaceId]/home/home-fallback'
 import { sendPayload } from '@/app/workspace/[workspaceId]/home/hooks/send-queue-policy'
 import {
@@ -79,6 +78,12 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
   const queryClient = useQueryClient()
   const controller = useResourcePanelController()
   const firstName = userName?.split(' ')[0] ?? ''
+  const hour = new Date().getHours()
+  const timeGreeting =
+    hour < 5 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер'
+  const homeHeading = firstName
+    ? `${timeGreeting}, ${firstName}. Что сделаем?`
+    : `${timeGreeting}. Что сделаем?`
   const posthog = usePostHog()
   const posthogRef = useRef(posthog)
   posthogRef.current = posthog
@@ -436,11 +441,9 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
         )}
         {showEmptyState ? (
           <div className='h-full overflow-y-auto [scrollbar-gutter:stable_both-edges]'>
-            {/* Asymmetric padding biases the group up so the full cluster (heading + input + suggestions) sits at the optical center */}
+            {/* Asymmetric padding biases the group up so the full cluster (heading + input) sits at the optical center */}
             <div className='flex min-h-full flex-col items-center justify-center px-3 pt-14 pb-8 md:px-6 md:pt-[2vh] md:pb-[22vh]'>
-              <h1 className={cn(pageHeadingClassName, 'mb-7 max-w-chat')}>
-                What should we get done{firstName ? `, ${firstName}` : ''}?
-              </h1>
+              <h1 className={cn(pageHeadingClassName, 'mb-7 max-w-chat')}>{homeHeading}</h1>
               <div ref={initialViewInputRef} className='relative w-full max-w-chat'>
                 <ChatSurfaceProvider
                   userId={userId}
@@ -462,14 +465,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
                     onStopGeneration={handleStopGeneration}
                   />
                 </ChatSurfaceProvider>
-                {/* Anchored out of flow so expanding/collapsing never shifts the centered input */}
-                <div className='relative md:absolute md:inset-x-0 md:top-full'>
-                  <SuggestedActions
-                    onSelectPrompt={(prompt) =>
-                      initialViewUserInputRef.current?.populatePrompt(prompt)
-                    }
-                  />
-                </div>
               </div>
             </div>
           </div>

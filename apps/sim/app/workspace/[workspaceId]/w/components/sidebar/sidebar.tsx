@@ -56,6 +56,7 @@ import { isIntegrationUsable } from '@/lib/integrations/access'
 import { SIM_RESOURCES_DRAG_TYPE } from '@/lib/mothership/resource-types'
 import { captureEvent } from '@/lib/posthog/client'
 import { LOGO_ACCEPT_ATTRIBUTE } from '@/lib/uploads/client/logo-file'
+import { AppsSection } from '@/app/workspace/[workspaceId]/apps/components'
 import { useSidebarChrome } from '@/app/workspace/[workspaceId]/components/workspace-chrome'
 import { CONNECT_MODE } from '@/app/workspace/[workspaceId]/integrations/connect-route'
 import { useFeatureFlag } from '@/app/workspace/[workspaceId]/providers/feature-flags-provider'
@@ -1548,6 +1549,12 @@ export const Sidebar = memo(function Sidebar({ organizationHref, desktopExecutor
                   {...scrollFadeAttributes(scrollEdges)}
                 >
                   <div ref={scrollContentRef} className='flex flex-col'>
+                    <AppsSection
+                      workspaceId={workspaceId}
+                      isCollapsed={isCollapsed}
+                      pathname={pathname}
+                    />
+
                     {chatEnabled && !permissionConfig.hideCopilot && (
                       <SidebarSection
                         title='Chats'

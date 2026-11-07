@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
 const PLACEHOLDER = {
-  prefix: 'Ask Sim to ',
+  prefix: 'Попросите FM AI Hub ',
   suffixes: [
-    'respond to my emails...',
-    'find and track leads...',
-    'DM me Linear updates on Slack...',
-    'track GitHub commits...',
+    'ответить на письма...',
+    'найти и вести лиды...',
+    'присылать обновления Linear в Slack...',
+    'следить за коммитами в GitHub...',
   ],
 } as const
 const TYPE_SPEED_MS = 60

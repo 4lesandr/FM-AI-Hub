@@ -3,8 +3,8 @@
 import { Badge, chipVariants, cn, DropdownMenuItem, OverflowText } from '@sim/emcn'
 import { Box } from '@sim/emcn/icons'
 import Link from 'next/link'
-import { InstallationUpdateControls } from '@/app/apps/components/installation-update-controls'
 import { appsHomePath, appsInstallationPath } from '@/lib/navigation/installation-paths'
+import { InstallationUpdateControls } from '@/app/workspace/[workspaceId]/apps/components/installation-update-controls'
 import {
   CollapsedSidebarMenu,
   SidebarSection,
@@ -20,21 +20,25 @@ import {
 } from '@/hooks/queries/agent-installations'
 
 interface AppsSectionProps {
+  workspaceId: string
   isCollapsed: boolean
   pathname: string | null
 }
 
-function isCurrentInstallation(pathname: string | null, installationId: string): boolean {
+function isCurrentInstallation(
+  pathname: string | null,
+  workspaceId: string,
+  installationId: string
+): boolean {
   if (!pathname) return false
-  const base = `/apps/${installationId}`
+  const base = `${appsHomePath(workspaceId)}/${installationId}`
   return pathname === base || pathname.startsWith(`${base}/`)
 }
 
 /**
- * Agent-home rail section: active Installations from U1 list API.
- * Pending rows show badge + Accept/Defer (U4) — not only the workspace banner.
+ * Workspace rail section: active Installations from session list API.
  */
-export function AppsSection({ isCollapsed, pathname }: AppsSectionProps) {
+export function AppsSection({ workspaceId, isCollapsed, pathname }: AppsSectionProps) {
   const hover = useHoverMenu()
   const { data, isLoading } = useAgentInstallations()
   const { data: pendingData } = usePendingAgentInstallationUpdates()
@@ -60,8 +64,10 @@ export function AppsSection({ isCollapsed, pathname }: AppsSectionProps) {
               <DropdownMenuItem disabled>Нет приложений</DropdownMenuItem>
             ) : (
               installations.map((installation) => {
-                const href = appsInstallationPath(installation.id, { title: installation.name })
-                const active = isCurrentInstallation(pathname, installation.id)
+                const href = appsInstallationPath(workspaceId, installation.id, {
+                  title: installation.name,
+                })
+                const active = isCurrentInstallation(pathname, workspaceId, installation.id)
                 return (
                   <DropdownMenuItem key={installation.id} asChild>
                     <Link href={href} aria-current={active ? 'page' : undefined}>
@@ -77,7 +83,7 @@ export function AppsSection({ isCollapsed, pathname }: AppsSectionProps) {
               })
             )}
             <DropdownMenuItem asChild>
-              <Link href={appsHomePath()}>Домой</Link>
+              <Link href={appsHomePath(workspaceId)}>Домой</Link>
             </DropdownMenuItem>
           </CollapsedSidebarMenu>
         </div>
@@ -90,8 +96,10 @@ export function AppsSection({ isCollapsed, pathname }: AppsSectionProps) {
           )}
           {!isLoading &&
             installations.map((installation) => {
-              const href = appsInstallationPath(installation.id, { title: installation.name })
-              const active = isCurrentInstallation(pathname, installation.id)
+              const href = appsInstallationPath(workspaceId, installation.id, {
+                title: installation.name,
+              })
+              const active = isCurrentInstallation(pathname, workspaceId, installation.id)
               const pending = pendingById.get(installation.id)
               return (
                 <div key={installation.id} className='flex flex-col gap-0.5'>
@@ -116,6 +124,7 @@ export function AppsSection({ isCollapsed, pathname }: AppsSectionProps) {
                   {pending ? (
                     <InstallationUpdateControls
                       compact
+                      workspaceId={workspaceId}
                       installationId={pending.installationId}
                       pinnedVersion={pending.pinnedVersion}
                       latestVersion={pending.latestVersion}

@@ -16,7 +16,7 @@ export default async function HomeLayout({
 }) {
   if (!isChatEnabled) {
     const { workspaceId } = await params
-    redirect(`/workspace/${workspaceId}`)
+    redirect(`/workspace/${workspaceId}/apps`)
   }
 
   return <div className='flex h-full flex-1 flex-col overflow-hidden'>{children}</div>
