@@ -1,0 +1,21 @@
+# Copy to backend.hcl (gitignored) or:
+#   terraform init -backend-config=backend.hcl.example
+#
+# Credentials: set -a && source ~/.config/vkcloud/fmah-tfstate.env && set +a
+# Required env from that file:
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+#
+# Hotbox endpoints (either works for this account):
+#   https://hb.bizmrg.com
+#   https://hb.ru-msk.vkcs.cloud  (FMAH legacy)
+
+bucket   = "fmah-tfstate-vk"
+key      = "fm-ai-hub/vk-dev/terraform.tfstate"
+region   = "ru-msk"
+endpoint = "https://hb.ru-msk.vkcs.cloud"
+
+skip_credentials_validation = true
+skip_metadata_api_check     = true
+skip_region_validation      = true
+force_path_style            = true

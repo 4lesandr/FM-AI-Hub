@@ -18,9 +18,20 @@ deploy/
   README.md
   tenants/flomni.yaml       # контур / OIDC заметки
   helm/values-flomni.yaml   # overlay на helm/sim
+  terraform/vk-dev/         # VK warm(STD3-4-16) + CI builder (IaC)
+  bin/vk_build_artifact.sh  # Gate C кнопка/ops
+  bin/vk_deploy_dev.sh      # warm next start (ACK_MANUAL_UP)
+  bin/vk_tf_sync_state.sh   # TF outputs → fmah-builder.state
 ```
 
 Чарт: `helm/sim` в корне репо.
+
+## VK warm / CI (IaC)
+
+Locked 2026-11-07: warm **STD3-4-16** только ручной up→down; CI **STD3-16-32** (fallback 32-64).  
+Docs: [`terraform/vk-dev/README.md`](terraform/vk-dev/README.md).  
+Actions: **Build VK artifact (manual)**, **Deploy-dev VK (manual)** — не auto на push.  
+Prod promote: **Deploy hub (manual)** тем же `gitSha`.
 
 ## Порядок выкладки (/2)
 

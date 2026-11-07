@@ -1,0 +1,81 @@
+# Кнопка Gate C: сборка artifact на VK builder (не auto на каждый push).
+# Реальная работа: deploy/bin/vk_build_artifact.sh на машине с openrc + SSH key
+# (self-hosted / Air ops). GHA ubuntu без секретов — только валидация входа.
+name: Build VK artifact (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: "git SHA или ref (пусто = tip feat/fm-mvp на runner checkout)"
+        required: false
+        type: string
+        default: ""
+      flavor:
+        description: "CI flavor (primary STD3-16-32; fallback STD3-32-64 при OOM — вручную)"
+        required: true
+        type: choice
+        options:
+          - STD3-16-32
+          - STD3-32-64
+        default: STD3-16-32
+      run_remote:
+        description: "true = SSH на VK builder через secrets (иначе dry checklist)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-vk-artifact
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha != '' && inputs.git_sha || github.ref }}
+          fetch-depth: 0
+      - id: pin
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ inputs.git_sha }}"
+          echo "flavor=${{ inputs.flavor }}"
+          echo "pinned_sha=$SHA"
+      - name: Checklist (manual gate)
+        if: ${{ !inputs.run_remote }}
+        run: |
+          cat <<EOF
+          Manual gate — на Air/ops host:
+            PURPOSE=ci FLAVOR=${{ inputs.flavor }} \\
+              GIT_SHA=${{ steps.pin.outputs.sha }} \\
+              bash deploy/bin/vk_build_artifact.sh
+            # после seal:
+            ~/.config/vkcloud/fmah-builder-down.sh
+          Fail closed: manifest.gitSha и BUILD_ID обязаны совпасть с pin.
+          Не destroy volume пока landing=vk-volume.
+          EOF
+
+  build-remote:
+    needs: validate
+    if: ${{ inputs.run_remote }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+      - name: Require secrets
+        env:
+          VK_BUILDER_HOST: ${{ secrets.VK_BUILDER_HOST }}
+          VK_BUILDER_SSH_KEY: ${{ secrets.VK_BUILDER_SSH_KEY }}
+        run: |
+          test -n "$VK_BUILDER_HOST" || { echo "missing secret VK_BUILDER_HOST"; exit 1; }
+          test -n "$VK_BUILDER_SSH_KEY" || { echo "missing secret VK_BUILDER_SSH_KEY"; exit 1; }
+      - name: Note
+        run: |
+          echo "Remote SSH build from GHA is not wired yet (need self-hosted or VK_BUILDER_* secrets + runner scripts)."
+          echo "Preferred path today: local vk_build_artifact.sh (LaunchAgent-compatible)."
+          echo "Re-run with run_remote=false for the checklist, or use deploy/bin/vk_build_artifact.sh on ops host."

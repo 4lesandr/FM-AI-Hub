@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (gitignored) if you need overrides.
+# Defaults already match locked CI/CD model (2026-11-07).
+
+role = "dev"
+# flavor_override = "STD3-32-64"   # only when importing live CI/fallback host
+# name = "dev-fm-agenthub"
+# volume_name = "dev-fm-agenthub-boot-32"  # match live name on import
+# volume_size_gb = 100
+# az = "PA2"

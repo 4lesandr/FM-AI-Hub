@@ -1,0 +1,45 @@
+# Кнопка warm deploy-dev: next start от sealed artifact на VK.
+# Подъём compute — только с ACK (ручной up); не auto на push.
+name: Deploy-dev VK (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: "gitSha артефакта (обязателен)"
+        required: true
+        type: string
+      ack_manual_up:
+        description: "Подтверждаю ручной up warm STD3-4-16 (антипростой)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-dev-vk
+  cancel-in-progress: false
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        run: |
+          SHA='${{ inputs.git_sha }}'
+          test -n "$SHA" || exit 1
+          if [[ '${{ inputs.ack_manual_up }}' != 'true' ]]; then
+            cat <<EOF
+          REFUSE without ack_manual_up.
+          На ops host:
+            PURPOSE=dev FLAVOR=STD3-4-16 ~/.config/vkcloud/fmah-builder-up.sh
+            ACK_MANUAL_UP=1 GIT_SHA=$SHA bash deploy/bin/vk_deploy_dev.sh
+            # URL: http://\$IP:3000
+            # когда закончили: fmah-builder-down.sh
+          Promote prod: Deploy hub (manual) + CUTOVER-runbook — тот же sha=$SHA
+          EOF
+            exit 0
+          fi
+          cat <<EOF
+          Ack received for sha=$SHA.
+          Run on ops host (GHA does not hold openrc/SSH by default):
+            ACK_MANUAL_UP=1 GIT_SHA=$SHA bash deploy/bin/vk_deploy_dev.sh
+          EOF

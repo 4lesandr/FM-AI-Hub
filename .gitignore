@@ -52,6 +52,22 @@ dump.rdb
 .env.test
 .env.production
 
+# Terraform (VK warm/CI) — secrets & local state never in git
+# Keep .terraform.lock.hcl committed for reproducible providers.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+deploy/terraform/**/backend.hcl
+deploy/terraform/**/.terraformrc
+
 # editor swap files
 *.sw?
 

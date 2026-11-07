@@ -1,0 +1,17 @@
+# Geo-block workaround for registry.terraform.io from RU.
+#   export TF_CLI_CONFIG_FILE=$PWD/.terraformrc
+# after copying this file to .terraformrc and installing the provider:
+#   ~/.terraform.d/plugins/registry.terraform.io/vk-cs/vkcs/<ver>/darwin_arm64/
+#
+# Download:
+#   https://github.com/vk-cs/terraform-provider-vkcs/releases
+
+provider_installation {
+  filesystem_mirror {
+    path    = "$HOME/.terraform.d/plugins"
+    include = ["registry.terraform.io/vk-cs/vkcs"]
+  }
+  direct {
+    exclude = ["registry.terraform.io/vk-cs/vkcs"]
+  }
+}
