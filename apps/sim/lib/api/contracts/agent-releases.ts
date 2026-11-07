@@ -19,6 +19,8 @@ export const publishAgentReleaseResponseSchema = z.object({
   /** Tenant stamp from the author's workspace (null = personal / non-org). */
   organizationId: nonEmptyIdSchema.nullable(),
   version: z.number().int().positive(),
+  /** True when Publish reused the active release (snapshot unchanged). */
+  unchanged: z.boolean(),
   shareToken: z.string().min(1),
   shareUrl: z.string().url(),
   createdAt: z.string().datetime(),

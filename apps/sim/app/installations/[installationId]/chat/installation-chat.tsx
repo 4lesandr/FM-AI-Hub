@@ -38,7 +38,7 @@ const NEAR_BOTTOM_THRESHOLD_PX = 100
 /** Fills the agent-home content pane under WorkspaceChrome (`/apps/{id}`). */
 function ChatPane({ children }: { children: React.ReactNode }) {
   return (
-    <div className='light flex h-full min-h-0 flex-col bg-[var(--bg)] text-[var(--text-primary)]'>
+    <div className='flex h-full min-h-0 flex-col bg-[var(--bg)] text-[var(--text-primary)]'>
       {children}
     </div>
   )
@@ -95,10 +95,10 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
   const chatConfig = useMemo(
     () => ({
       title: titleParam || 'Agent',
-      description: 'Чат с установленным агентом. История сохраняется на сервере.',
+      description: 'Чат с установленным приложением. История сохраняется на сервере.',
       customizations: {
         headerText: titleParam || 'Agent',
-        welcomeMessage: 'Напишите сообщение — ответ пойдёт через вашу Installation.',
+        welcomeMessage: 'Напишите сообщение — ответит агент этого приложения.',
       },
     }),
     [titleParam]
@@ -283,7 +283,7 @@ export function InstallationChat({ installationId }: InstallationChatProps) {
       : legacyAppsInstallationPath(installationId, { title: titleParam })
     return (
       <ChatPane>
-        <ChatErrorState error='Войдите, чтобы открыть чат Installation.' />
+        <ChatErrorState error='Войдите, чтобы открыть чат приложения.' />
         <div className='flex justify-center pb-10'>
           <Button
             type='button'

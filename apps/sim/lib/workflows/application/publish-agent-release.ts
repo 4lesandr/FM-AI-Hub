@@ -42,6 +42,8 @@ export interface PublishAgentReleaseResult {
   /** Tenant stamp copied from the author's workspace (null = personal). */
   organizationId: string | null
   version: number
+  /** True when snapshot matched the active release — no new version. */
+  unchanged: boolean
   shareToken: string
   /** Absolute Install-by-link URL for the author to share. */
   shareUrl: string
@@ -120,6 +122,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
         workspaceId: context.workspaceId,
         organizationId: context.workspaceOrganizationId,
         version: activeRelease.version,
+        unchanged: true,
         shareToken: activeRelease.shareToken,
         shareUrl,
         createdAt: activeRelease.createdAt.toISOString(),
@@ -206,6 +209,7 @@ export const publishAgentRelease = defineAuthorizedWorkflowUseCase({
       workspaceId: context.workspaceId,
       organizationId: context.workspaceOrganizationId,
       version: result.version,
+      unchanged: false,
       shareToken,
       shareUrl,
       createdAt: result.createdAt.toISOString(),

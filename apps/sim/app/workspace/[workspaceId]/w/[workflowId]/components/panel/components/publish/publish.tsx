@@ -79,11 +79,11 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
   }, [shareUrl])
 
   const getTooltipText = () => {
-    if (isEmpty) return 'Cannot publish an empty workflow'
-    if (!canPublish) return 'Write permissions required'
-    if (disabled) return 'Workflow is locked'
-    if (isPublishing) return 'Publishing...'
-    return 'Publish Install-by-link edition'
+    if (isEmpty) return 'Нельзя опубликовать пустой сценарий'
+    if (!canPublish) return 'Нужны права на редактирование'
+    if (disabled) return 'Сценарий заблокирован'
+    if (isPublishing) return 'Публикуем…'
+    return 'Опубликовать версию для установки по ссылке'
   }
 
   const runPublish = async () => {
@@ -126,7 +126,7 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
               onClick={() => void runPublish()}
               disabled={isRegistryLoading || isDisabled}
             >
-              {isPublishing ? 'Publishing...' : 'Publish'}
+              {isPublishing ? 'Публикуем…' : 'Опубликовать'}
             </Chip>
           </span>
         </Tooltip.Trigger>
@@ -139,16 +139,16 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
           if (!open) handleClose()
         }}
         size='sm'
-        srTitle='Published agent release'
+        srTitle='Опубликованная версия'
       >
         <ChipModalHeader onClose={handleClose}>
-          {release ? `Published v${release.version}` : 'Published'}
+          {release ? (release.unchanged ? `Уже опубликовано · v${release.version}` : `Опубликовано · v${release.version}`) : 'Опубликовано'}
         </ChipModalHeader>
         <ChipModalBody>
           <ChipModalField
             type='custom'
-            title='Install link'
-            hint='Org-bound Install link. Secrets/ENV names redacted; prompts are shared IP (use promptTier strip-system to clear system prompts).'
+            title='Ссылка для установки'
+            hint='Ссылка для установки в вашу организацию. Секреты скрыты.'
           >
             {(aria) => (
               <ChipInput
@@ -164,7 +164,7 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
                         variant='quiet'
                         size='icon'
                         onClick={() => void copyInstallLink()}
-                        aria-label='Copy install link'
+                        aria-label='Скопировать ссылку'
                       >
                         {linkCopied ? (
                           <Check className='size-[13px]' />
@@ -174,7 +174,7 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
                       </Button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>
-                      {linkCopied ? 'Copied!' : 'Copy install link'}
+                      {linkCopied ? 'Скопировано' : 'Скопировать ссылку'}
                     </Tooltip.Content>
                   </Tooltip.Root>
                 }
@@ -195,7 +195,7 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
                         leftIcon={linkCopied ? Check : Link}
                         onClick={() => void copyInstallLink()}
                       >
-                        {linkCopied ? 'Copied!' : 'Copy link'}
+                        {linkCopied ? 'Скопировано' : 'Скопировать'}
                       </Chip>
                     ),
                   },
@@ -203,8 +203,18 @@ export function Publish({ activeWorkflowId, userPermissions, disabled = false }:
               : undefined
           }
           primaryAction={{
-            label: isPublishing ? 'Publishing...' : 'Publish again',
-            onClick: () => void runPublish(),
+            label: release?.unchanged
+              ? 'Закрыть'
+              : isPublishing
+                ? 'Публикуем…'
+                : 'Опубликовать снова',
+            onClick: () => {
+              if (release?.unchanged) {
+                handleClose()
+                return
+              }
+              void runPublish()
+            },
             disabled: isRegistryLoading || isDisabled,
           }}
         />

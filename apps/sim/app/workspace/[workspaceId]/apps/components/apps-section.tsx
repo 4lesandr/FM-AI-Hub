@@ -83,7 +83,7 @@ export function AppsSection({ workspaceId, isCollapsed, pathname }: AppsSectionP
               })
             )}
             <DropdownMenuItem asChild>
-              <Link href={appsHomePath(workspaceId)}>Домой</Link>
+              <Link href={appsHomePath(workspaceId)}>Все приложения</Link>
             </DropdownMenuItem>
           </CollapsedSidebarMenu>
         </div>
