@@ -83,7 +83,7 @@ export function AgentInstallationUpdatesBanner() {
                 disabled={busy}
                 onClick={() => void handleAccept(update)}
               >
-                Accept
+                Принять
               </Button>
               <Button
                 type='button'
@@ -92,7 +92,7 @@ export function AgentInstallationUpdatesBanner() {
                 disabled={busy}
                 onClick={() => void deferMutation.mutateAsync(update.installationId)}
               >
-                Defer
+                Отложить
               </Button>
               <Button
                 type='button'

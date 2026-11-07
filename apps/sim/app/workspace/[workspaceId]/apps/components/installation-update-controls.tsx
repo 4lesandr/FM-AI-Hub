@@ -84,7 +84,7 @@ export function InstallationUpdateControls({
             void handleAccept()
           }}
         >
-          Accept
+          Принять
         </Button>
         <Button
           type='button'
@@ -97,7 +97,7 @@ export function InstallationUpdateControls({
             void handleDefer()
           }}
         >
-          Defer
+          Отложить
         </Button>
       </div>
     </div>
